@@ -56,9 +56,17 @@ net.load_json(layer, flow)
 
 A example of converting torchvision resnet18 model can be seen in ```planer_onnx/``` folder. 
 
+## Network visualization
+
+We provide a powerful visualization tools for the cnn model. Just call ```net.show()``` will work.
+
+![](https://user-images.githubusercontent.com/24822467/78111180-dc350000-742e-11ea-9152-30dad06ee433.png)
+
 
 ## Demos
 We have released some demos, which can be investigated inside ```demo/``` folder.
+
+![](resources/demos.png)
 
 
 
