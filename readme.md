@@ -51,9 +51,10 @@ flow = [('x', ['conv', 'relu'], 'x'),
 net = Net()
 net.load_json(layer, flow)
 ```
+
 * ONNX-converted (all the demos)
 
-Coming soon.
+A example of converting torchvision resnet18 model can be seen in ```planer_onnx/``` folder. 
 
 
 ## Demos
