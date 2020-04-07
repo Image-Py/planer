@@ -1,0 +1,89 @@
+graph(%input : Float(1, 3, 200, 200),
+      %moduleVggOne.0.weight : Float(64, 3, 3, 3),
+      %moduleVggOne.0.bias : Float(64),
+      %moduleVggOne.2.weight : Float(64, 64, 3, 3),
+      %moduleVggOne.2.bias : Float(64),
+      %moduleVggTwo.1.weight : Float(128, 64, 3, 3),
+      %moduleVggTwo.1.bias : Float(128),
+      %moduleVggTwo.3.weight : Float(128, 128, 3, 3),
+      %moduleVggTwo.3.bias : Float(128),
+      %moduleVggThr.1.weight : Float(256, 128, 3, 3),
+      %moduleVggThr.1.bias : Float(256),
+      %moduleVggThr.3.weight : Float(256, 256, 3, 3),
+      %moduleVggThr.3.bias : Float(256),
+      %moduleVggThr.5.weight : Float(256, 256, 3, 3),
+      %moduleVggThr.5.bias : Float(256),
+      %moduleVggFou.1.weight : Float(512, 256, 3, 3),
+      %moduleVggFou.1.bias : Float(512),
+      %moduleVggFou.3.weight : Float(512, 512, 3, 3),
+      %moduleVggFou.3.bias : Float(512),
+      %moduleVggFou.5.weight : Float(512, 512, 3, 3),
+      %moduleVggFou.5.bias : Float(512),
+      %moduleVggFiv.1.weight : Float(512, 512, 3, 3),
+      %moduleVggFiv.1.bias : Float(512),
+      %moduleVggFiv.3.weight : Float(512, 512, 3, 3),
+      %moduleVggFiv.3.bias : Float(512),
+      %moduleVggFiv.5.weight : Float(512, 512, 3, 3),
+      %moduleVggFiv.5.bias : Float(512),
+      %moduleScoreOne.weight : Float(1, 64, 1, 1),
+      %moduleScoreOne.bias : Float(1),
+      %moduleScoreTwo.weight : Float(1, 128, 1, 1),
+      %moduleScoreTwo.bias : Float(1),
+      %moduleScoreThr.weight : Float(1, 256, 1, 1),
+      %moduleScoreThr.bias : Float(1),
+      %moduleScoreFou.weight : Float(1, 512, 1, 1),
+      %moduleScoreFou.bias : Float(1),
+      %moduleScoreFiv.weight : Float(1, 512, 1, 1),
+      %moduleScoreFiv.bias : Float(1),
+      %moduleCombine.0.weight : Float(1, 5, 1, 1),
+      %moduleCombine.0.bias : Float(1)):
+  %39 : Float(1, 64, 200, 200) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%input, %moduleVggOne.0.weight, %moduleVggOne.0.bias), scope: Network/Sequential[moduleVggOne]/Conv2d[0]
+  %40 : Float(1, 64, 200, 200) = onnx::Relu(%39), scope: Network/Sequential[moduleVggOne]/ReLU[1]
+  %41 : Float(1, 64, 200, 200) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%40, %moduleVggOne.2.weight, %moduleVggOne.2.bias), scope: Network/Sequential[moduleVggOne]/Conv2d[2]
+  %42 : Float(1, 64, 200, 200) = onnx::Relu(%41), scope: Network/Sequential[moduleVggOne]/ReLU[3]
+  %43 : Float(1, 64, 100, 100) = onnx::MaxPool[kernel_shape=[2, 2], pads=[0, 0, 0, 0], strides=[2, 2]](%42), scope: Network/Sequential[moduleVggTwo]/MaxPool2d[0]
+  %44 : Float(1, 128, 100, 100) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%43, %moduleVggTwo.1.weight, %moduleVggTwo.1.bias), scope: Network/Sequential[moduleVggTwo]/Conv2d[1]
+  %45 : Float(1, 128, 100, 100) = onnx::Relu(%44), scope: Network/Sequential[moduleVggTwo]/ReLU[2]
+  %46 : Float(1, 128, 100, 100) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%45, %moduleVggTwo.3.weight, %moduleVggTwo.3.bias), scope: Network/Sequential[moduleVggTwo]/Conv2d[3]
+  %47 : Float(1, 128, 100, 100) = onnx::Relu(%46), scope: Network/Sequential[moduleVggTwo]/ReLU[4]
+  %48 : Float(1, 128, 50, 50) = onnx::MaxPool[kernel_shape=[2, 2], pads=[0, 0, 0, 0], strides=[2, 2]](%47), scope: Network/Sequential[moduleVggThr]/MaxPool2d[0]
+  %49 : Float(1, 256, 50, 50) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%48, %moduleVggThr.1.weight, %moduleVggThr.1.bias), scope: Network/Sequential[moduleVggThr]/Conv2d[1]
+  %50 : Float(1, 256, 50, 50) = onnx::Relu(%49), scope: Network/Sequential[moduleVggThr]/ReLU[2]
+  %51 : Float(1, 256, 50, 50) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%50, %moduleVggThr.3.weight, %moduleVggThr.3.bias), scope: Network/Sequential[moduleVggThr]/Conv2d[3]
+  %52 : Float(1, 256, 50, 50) = onnx::Relu(%51), scope: Network/Sequential[moduleVggThr]/ReLU[4]
+  %53 : Float(1, 256, 50, 50) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%52, %moduleVggThr.5.weight, %moduleVggThr.5.bias), scope: Network/Sequential[moduleVggThr]/Conv2d[5]
+  %54 : Float(1, 256, 50, 50) = onnx::Relu(%53), scope: Network/Sequential[moduleVggThr]/ReLU[6]
+  %55 : Float(1, 256, 25, 25) = onnx::MaxPool[kernel_shape=[2, 2], pads=[0, 0, 0, 0], strides=[2, 2]](%54), scope: Network/Sequential[moduleVggFou]/MaxPool2d[0]
+  %56 : Float(1, 512, 25, 25) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%55, %moduleVggFou.1.weight, %moduleVggFou.1.bias), scope: Network/Sequential[moduleVggFou]/Conv2d[1]
+  %57 : Float(1, 512, 25, 25) = onnx::Relu(%56), scope: Network/Sequential[moduleVggFou]/ReLU[2]
+  %58 : Float(1, 512, 25, 25) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%57, %moduleVggFou.3.weight, %moduleVggFou.3.bias), scope: Network/Sequential[moduleVggFou]/Conv2d[3]
+  %59 : Float(1, 512, 25, 25) = onnx::Relu(%58), scope: Network/Sequential[moduleVggFou]/ReLU[4]
+  %60 : Float(1, 512, 25, 25) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%59, %moduleVggFou.5.weight, %moduleVggFou.5.bias), scope: Network/Sequential[moduleVggFou]/Conv2d[5]
+  %61 : Float(1, 512, 25, 25) = onnx::Relu(%60), scope: Network/Sequential[moduleVggFou]/ReLU[6]
+  %62 : Float(1, 512, 12, 12) = onnx::MaxPool[kernel_shape=[2, 2], pads=[0, 0, 0, 0], strides=[2, 2]](%61), scope: Network/Sequential[moduleVggFiv]/MaxPool2d[0]
+  %63 : Float(1, 512, 12, 12) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%62, %moduleVggFiv.1.weight, %moduleVggFiv.1.bias), scope: Network/Sequential[moduleVggFiv]/Conv2d[1]
+  %64 : Float(1, 512, 12, 12) = onnx::Relu(%63), scope: Network/Sequential[moduleVggFiv]/ReLU[2]
+  %65 : Float(1, 512, 12, 12) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%64, %moduleVggFiv.3.weight, %moduleVggFiv.3.bias), scope: Network/Sequential[moduleVggFiv]/Conv2d[3]
+  %66 : Float(1, 512, 12, 12) = onnx::Relu(%65), scope: Network/Sequential[moduleVggFiv]/ReLU[4]
+  %67 : Float(1, 512, 12, 12) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[3, 3], pads=[1, 1, 1, 1], strides=[1, 1]](%66, %moduleVggFiv.5.weight, %moduleVggFiv.5.bias), scope: Network/Sequential[moduleVggFiv]/Conv2d[5]
+  %68 : Float(1, 512, 12, 12) = onnx::Relu(%67), scope: Network/Sequential[moduleVggFiv]/ReLU[6]
+  %69 : Float(1, 1, 200, 200) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[1, 1], pads=[0, 0, 0, 0], strides=[1, 1]](%42, %moduleScoreOne.weight, %moduleScoreOne.bias), scope: Network/Conv2d[moduleScoreOne]
+  %70 : Float(1, 1, 100, 100) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[1, 1], pads=[0, 0, 0, 0], strides=[1, 1]](%47, %moduleScoreTwo.weight, %moduleScoreTwo.bias), scope: Network/Conv2d[moduleScoreTwo]
+  %71 : Float(1, 1, 50, 50) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[1, 1], pads=[0, 0, 0, 0], strides=[1, 1]](%54, %moduleScoreThr.weight, %moduleScoreThr.bias), scope: Network/Conv2d[moduleScoreThr]
+  %72 : Float(1, 1, 25, 25) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[1, 1], pads=[0, 0, 0, 0], strides=[1, 1]](%61, %moduleScoreFou.weight, %moduleScoreFou.bias), scope: Network/Conv2d[moduleScoreFou]
+  %73 : Float(1, 1, 12, 12) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[1, 1], pads=[0, 0, 0, 0], strides=[1, 1]](%68, %moduleScoreFiv.weight, %moduleScoreFiv.bias), scope: Network/Conv2d[moduleScoreFiv]
+  %74 : Tensor = onnx::Constant[value= 1  1  1  1 [ Variable[CPUType]{4} ]](), scope: Network
+  %75 : Float(1, 1, 200, 200) = onnx::Upsample[mode="linear"](%69, %74), scope: Network
+  %76 : Tensor = onnx::Constant[value= 1  1  2  2 [ Variable[CPUType]{4} ]](), scope: Network
+  %77 : Float(1, 1, 200, 200) = onnx::Upsample[mode="linear"](%70, %76), scope: Network
+  %78 : Tensor = onnx::Constant[value= 1  1  4  4 [ Variable[CPUType]{4} ]](), scope: Network
+  %79 : Float(1, 1, 200, 200) = onnx::Upsample[mode="linear"](%71, %78), scope: Network
+  %80 : Tensor = onnx::Constant[value= 1  1  8  8 [ Variable[CPUType]{4} ]](), scope: Network
+  %81 : Float(1, 1, 200, 200) = onnx::Upsample[mode="linear"](%72, %80), scope: Network
+  %82 : Tensor = onnx::Constant[value=  1.0000   1.0000  16.6667  16.6667 [ Variable[CPUType]{4} ]](), scope: Network
+  %83 : Float(1, 1, 200, 200) = onnx::Upsample[mode="linear"](%73, %82), scope: Network
+  %84 : Float(1, 5, 200, 200) = onnx::Concat[axis=1](%75, %77, %79, %81, %83), scope: Network
+  %85 : Float(1, 1, 200, 200) = onnx::Conv[dilations=[1, 1], group=1, kernel_shape=[1, 1], pads=[0, 0, 0, 0], strides=[1, 1]](%84, %moduleCombine.0.weight, %moduleCombine.0.bias), scope: Network/Sequential[moduleCombine]/Conv2d[0]
+  %output : Float(1, 1, 200, 200) = onnx::Sigmoid(%85), scope: Network/Sequential[moduleCombine]/Sigmoid[1]
+  return (%output)
+
