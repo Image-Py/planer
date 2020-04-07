@@ -8,4 +8,6 @@ net = read_onnx('resnet18')
 # input should be float32
 x = pal.random.randn(1, 3, 224, 224).astype('float32')
 y = net(x)
+
+net.show()
 print(y.shape)
