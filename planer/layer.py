@@ -63,16 +63,13 @@ class Conv2d(Layer):
 
     def forward(self, x):
         out = conv(x, self.K, self.g, (self.s, self.s), (self.d, self.d))
-        out += self.bias
+        out += self.bias.reshape(1, -1, 1, 1)
         return out
 
     def load(self, buf):
         sk, sb = self.K.size, self.bias.size
         self.K.ravel()[:] = buf[:sk]
-        self.bias.ravel()[:] = buf[sk:sk+sb]
-
-        self.bias = self.bias.reshape((1, -1, 1, 1))
-
+        self.bias.ravel()[:] = buf[sk:sk+sb]        
         return sk + sb
 
 
