@@ -28,12 +28,14 @@ Running ```python trans_resnet18.py > resnet18.txt``` will have two files ```res
 
 And we can have a simple code to verify the converted model by
 ```python
-from npcnn import read_onnx
+from planer import read_onnx
 import numpy as np
+# get the planer array library
+pal = planer.core(np)
 # the same folder should contain resnet18.txt, resnet18.npy
 net = read_onnx('resnet18')
 # input should be float32
-x = np.random.randn(1, 3, 224, 224).astype('float32')
+x = pal.random.randn(1, 3, 224, 224).astype('float32')
 y = net(x)
 print(y.shape)
 ```
