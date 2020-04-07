@@ -15,39 +15,25 @@ def neighbors(shape, core, offset=0, dilation=1):
     return np.dot(idx.T, acc[::-1])
 
 
-def fill_col(pdimg, msk, idx, colimg):
-    rc = np.where(msk)[0]
-    rc = rc.reshape((-1, 1))+idx
-    colimg[:] = pdimg[rc.ravel()]
-    return colimg
-
-
 def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1), buf=['']):
-
-    strh, strw = stride
-    cimg_w = int(np.cumprod(core.shape[1:])[-1] * group)
-    imn, ic, ih, iw = img.shape
-    cimg_h = imn*(ih//strh)*(iw//strw)
-
-    (n, c, h, w), (dh, dw) = core.shape, dilation
+    (strh, strw), (dh, dw) = stride, dilation
+    n, c, h, w = core.shape
+    cimg_w = c * h * w * group
+    ni, ci, hi, wi = img.shape
+    cimg_h = ni*(hi//strh)*(wi//strw)
     shp = ((0, 0), (0, 0), (h*dh//2, h*dh//2), (w*dw//2, w*dw//2))
-    a = time()
-    pdimg = np.pad(img, shp, 'constant', constant_values=0)
-    imn, ic, ih, iw = pdimg.shape
+    img = np.pad(img, shp, 'constant', constant_values=0)
 
-    acc = np.cumprod((1,)+pdimg.shape[::-1][:-1])
+    acc = np.cumprod((1,)+img.shape[::-1][:-1])
+    nbs = neighbors(img.shape[1:], core.shape[1:], (0, 1, 1), (1, dh, dw))
 
-    nbs = neighbors(pdimg.shape[1:], core.shape[1:], (0, 1, 1), (1, dh, dw))
-
-    slicew = np.arange(w*dw//2, iw-(w*dw//2), strw) * acc[0]
-    sliceh = np.arange(h*dh//2, ih-(h*dh//2), strh) * acc[1]
-    slicec = np.arange(0, ic, c) * acc[2]
-    slicen = np.arange(0, imn, 1) * acc[3]
+    slicew = np.arange(w*dw//2, w*dw//2+wi, strw) * acc[0]
+    sliceh = np.arange(h*dh//2, h*dh//2+hi, strh) * acc[1]
+    slicec = np.arange(0, ci, c) * acc[2]
     idx = sliceh.reshape((-1, 1)) + slicew.ravel()
     idx = slicec.reshape((-1, 1)) + idx.ravel()
-    idx = slicen.reshape((-1, 1)) + idx.ravel()
     idx = idx.reshape((-1, 1)) + nbs
-    col_img = pdimg.ravel()[idx.ravel()]
+    col_img = img.reshape((ni,-1))[:,idx.ravel()]
 
     if group == 1:
         col_core = core.reshape((core.shape[0], -1))
@@ -59,22 +45,7 @@ def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1), buf=['']):
         rst = [i.dot(j.T) for i, j in zip(col_core, col_img)]
         rst = np.concatenate(rst)
 
-    ni, ci, hi, wi = img.shape
     return rst.reshape((ni, n, hi//strh, wi//strw))
-
-
-def fill_max(pdimg, msk, idx, colimg):
-    rc = np.where(msk)[0]
-    rc = rc.reshape((-1, 1))+idx
-    vs = pdimg[rc.ravel()].reshape((-1, len(idx)))
-    np.max(vs, axis=-1, out=colimg)
-
-
-def fill_mean(pdimg, msk, idx, colimg):
-    rc = np.where(msk)[0]
-    rc = rc.reshape((-1, 1))+idx
-    vs = pdimg[rc.ravel()].reshape((-1, len(idx)))
-    np.mean(vs, axis=-1, out=colimg)
 
 
 def pool(img, f, core=(2, 2), stride=(2, 2)):
@@ -98,7 +69,6 @@ def pool(img, f, core=(2, 2), stride=(2, 2)):
         colimg = colimg.max(axis=1)
     if f == 'mean':
         colimg = colimg.mean(axis=1)
-    dd = time()
     return colimg.reshape((n, c, h//strh, w//strw))
 
 
@@ -106,30 +76,6 @@ def maxpool(i, c=(2, 2), s=(2, 2)): return pool(i, 'max', c, s)
 
 
 def avgpool(i, c=(2, 2), s=(2, 2)): return pool(i, 'mean', c, s)
-
-
-def jit_bilinear(img, ra, rb, rs, _rs, ca, cb, cs, _cs, out):
-    h, w = img.shape
-    for r in range(out.shape[0]):
-        rar = ra[r]
-        rbr = rar+1
-        rsr = rs[r]
-        _rsr = _rs[r]
-        for c in range(out.shape[1]):
-            cac = ca[c]
-            cbc = cac+1
-            rra = img[rar, cac]*_rsr
-            rra += img[rbr, cac]*rsr
-            rrb = img[rar, cbc]*_rsr
-            rrb += img[rbr, cbc]*rsr
-            rcab = rra * _cs[c] + rrb * cs[c]
-            out[r, c] = rcab
-
-
-def bilinear(img, ra, rb, rs, _rs, ca, cb, cs, _cs, out):
-
-    buf = img[:, ca]*_cs + img[:, cb]*cs
-    out[:] = (buf[ra].T*_rs + buf[rb].T*rs).T
 
 
 def resize(img, size):
@@ -147,10 +93,7 @@ def resize(img, size):
     r = r.astype(np.uint32)
     c = c.astype(np.uint32)
 
-    rs -= r
-    cs -= c
-    _cs = 1-cs
-    _rs = 1-rs
+    rs -= r; cs -= c; _cs = 1-cs; _rs = 1-rs
     r.shape = rs.shape = _rs.shape = (-1, 1)
     img = img.reshape((-1, h*w))
 
