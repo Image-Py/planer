@@ -20,12 +20,13 @@ def parse(matched):
     gps = list(matched.groups())
     if len(matched.groups()) == 0:
         return ''
-
+    if gps[0]=='return':
+        gps.insert(0, 'plrst')
     for i in range(len(gps)):
         if '%' in gps[i]:
             gps[i] = gps[i].replace('%', "'")
-            gps[i] = gps[i].replace(')', "')")
             gps[i] = gps[i].replace(',', "',")
+            gps[i] = gps[i].replace(')', "',)")
         elif gps[i][-1] == ')' and len(gps[i]) > 2:
             gps[i] = gps[i][:-1]+',)'
 
@@ -54,7 +55,7 @@ add = re.compile(r'.*%(.+?) .+?(Add)(\(%.+?\)).+?\n')
 mul = re.compile(r'.*%(.+?) .+?(Mul)(\(%.+?\))\n')
 const = re.compile(r'.*%(.+?) .+?(Constant).*value=\{(.+?)\}.+?\n')
 weight = re.compile(r'.*%(.+?) .+?(\(.*?\)).*\n')
-output = re.compile(r'.*return (\(%.+?\))')
+output = re.compile(r'.*(return) (\(%.+?\))')
 
 
 res = (flatten, upsample, conv, relu, leakyrelu, gap, sigmoid, maxpool,
@@ -76,18 +77,16 @@ def read_onnx(path, cache=False):
         for i in res:
             cont = i.sub(parse, cont)
         # for i in cont.split('\n'): print(i)
-        cont = [eval(i) for i in cont.split('\n') if len(i) > 0 and i[0] == '[']
-        cont = [[eval(j) if (',' in j) else j for j in i] for i in cont]
+        cont = [eval(i) for i in cont.split('\n') if len(i) > 0 and i[0] in '[']
+        
+        cont = [[eval(j) if (',' in j) else j for j in i] for i in cont]        
 
         body = []
         flow = []
         key = {}
         for i in cont:
             num = len(body)
-            if len(i) == 1:
-                body.append(('return_%s' % num, 'return', None))
-                flow.append((i[0], ['return_%s' % num], 'return'))
-            elif len(i) == 2:
+            if len(i) == 2:
                 key[i[0]] = i[1]
             elif i[1] == 'Conv':
                 shp = [key[i[5][1]][j]
@@ -138,6 +137,10 @@ def read_onnx(path, cache=False):
             elif i[1] == 'Reshape':
                 body.append(('flatten_%s' % num, 'flatten', None))
                 flow.append((i[2], ['flatten_%s' % num], i[0]))
+            elif i[1] == 'return':
+                body.append(('return_%s' % num, 'return', None))
+                out = i[2] if len(i[2])>1 else i[2][0]
+                flow.append((out, ['return_%s' % num], i[0]))
         fp_body = open(path+'_body.json', 'w')
         fp_flow = open(path+'_flow.json', 'w')
         json.dump(body, fp_body)

@@ -4,8 +4,8 @@ import cupy as cp
 from time import time
 from skimage import io, transform
 from matplotlib import pyplot as plt
-import numpy
 import cupy
+import numpy
 import planer
 from planer import read_onnx, resize
 
@@ -13,7 +13,7 @@ from planer import read_onnx, resize
 # pal = planer.core(numpy)
 
 # get planer array library, cupy
-pal = planer.core(cupy)
+pal = planer.core(numpy)
 
 def normalize(img, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
     img = img.astype('float32')
@@ -39,6 +39,7 @@ net = read_onnx('craft')
 print('load done!')
 
 y = net(x)
+'''
 net.timer = {}
 start = time()
 print('start timing!')
@@ -64,3 +65,4 @@ plt.imshow(y[0, 1, :, :])
 plt.title('link map:%.3fs' % (runtime))
 
 plt.show()
+'''
