@@ -54,14 +54,16 @@ add = re.compile(r'.*%(.+?) .+?(Add)(\(%.+?\)).+?\n')
 mul = re.compile(r'.*%(.+?) .+?(Mul)(\(%.+?\))\n')
 const = re.compile(r'.*%(.+?) .+?(Constant).*value=\{(.+?)\}.+?\n')
 weight = re.compile(r'.*%(.+?) .+?(\(.*?\)).*\n')
+output = re.compile(r'.*return (\(%.+?\))')
+
 
 res = (flatten, upsample, conv, relu, leakyrelu, gap, sigmoid, maxpool,
-       avgpool, dense, concat, add, mul, const, batchnorm, weight)
+       avgpool, dense, concat, add, mul, const, batchnorm, weight, output)
 
 
-def read_onnx(path):
+def read_onnx(path, cache=False):
     start = time()
-    if os.path.exists(path+'_body.json') and os.path.exists(path+'_flow.json'):
+    if os.path.exists(path+'_body.json') and os.path.exists(path+'_flow.json') and cache:
         print('using cached body and flow')
         fp_body = open(path+'_body.json', 'r')
         fp_flow = open(path+'_flow.json', 'r')
@@ -82,7 +84,10 @@ def read_onnx(path):
         key = {}
         for i in cont:
             num = len(body)
-            if len(i) == 2:
+            if len(i) == 1:
+                body.append(('return_%s' % num, 'return', None))
+                flow.append((i[0], ['return_%s' % num], 'return'))
+            elif len(i) == 2:
                 key[i[0]] = i[1]
             elif i[1] == 'Conv':
                 shp = [key[i[5][1]][j]
@@ -133,7 +138,6 @@ def read_onnx(path):
             elif i[1] == 'Reshape':
                 body.append(('flatten_%s' % num, 'flatten', None))
                 flow.append((i[2], ['flatten_%s' % num], i[0]))
-        
         fp_body = open(path+'_body.json', 'w')
         fp_flow = open(path+'_flow.json', 'w')
         json.dump(body, fp_body)
