@@ -64,7 +64,7 @@ def resize(img, size):
     np.clip(cs, 0, w-1, out=cs)
     ra = np.floor(np.clip(rs, 0, h-1.5))
     ca = np.floor(np.clip(cs, 0, w-1.5))
-    ra, ca = np.array([ra, ca]).astype(np.uint32)
+    ra, ca = ra.astype(int), ca.astype(int)
     rs -= ra; cs -= ca; rb = ra+1; cb = ca+1;
     rs.shape, img.shape = (-1,1), (-1, h, w)
     buf = img[:,:,ca]*(1-cs) + img[:,:,cb]*cs
