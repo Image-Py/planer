@@ -128,21 +128,11 @@ class Maxpool(Layer):
     def __init__(self, w=2, stride=2):
         self.w = w
         self.stride = stride
-        if w==2 and stride ==2:
-            self.forward = self.forward_2x2s2
-        else:
-            self.forward = self.forward_
 
     def para(self): return (self.w, self.stride)
 
-    def forward_(self, x):
+    def forward(self, x):
         return maxpool(x, (self.w,) * 2, (self.stride,) * 2)
-
-    def forward_2x2s2(self, x):
-        n,c,h,w = x.shape
-        rshp = x.reshape(n,c,h//2,2,w//2,2)
-        rshp = rshp.transpose((0,1,2,4,3,5))
-        return rshp.max(axis=(4,5))
 
 
 class Avgpool(Layer):
