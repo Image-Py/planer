@@ -1,6 +1,6 @@
 ## Planer: Powerful Light Artificial NEuRon
 
-![](resources/logo.png)
+![](logo.png)
 
 A powerful light-weight inference framework for CNN. The aim of planer is to provide efficient and adaptable inference environment for CNN model. Also in order to enlarge the application scope, we support ONNX format, which enables the converting of trained model within various DL frameworks (PyTorch).  
 
@@ -87,6 +87,8 @@ import planer, clpy
 planer.core(clpy) # use clpy as backend
 ```
 
+We tested on windows, planer with cupy is 80-100 times faster then numpy. has a equal performance with torch. (but on linux torch is faster)
+
 ## Network visualization
 
 We provide a powerful visualization tools for the cnn model. Just call ```net.show()``` will work.
@@ -97,7 +99,7 @@ We provide a powerful visualization tools for the cnn model. Just call ```net.sh
 ## Demos
 We have released some demos, which can be investigated inside ```demo/``` folder.
 
-![](resources/demos.png)
+![](demo/demos.png)
 
 ## Planer-pro
 
