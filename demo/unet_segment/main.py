@@ -3,7 +3,7 @@ sys.path.append('../../')
 import numpy
 import cupy
 import planer
-from planer import read_onnx, resize
+from planer import read_net, resize
 from skimage import io
 from matplotlib import pyplot as plt
 from time import time
@@ -20,7 +20,7 @@ img_ = pal.array(img)
 
 x = img_[None, None, :, :]
 
-net = read_onnx('unet')
+net = read_net('unet')
 print('load done!')
 
 y = net(x)

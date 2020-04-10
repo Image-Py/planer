@@ -6,7 +6,7 @@ from skimage import io
 import numpy
 import cupy
 import planer
-from planer import read_onnx, resize
+from planer import read_net, resize
 
 # get planer array library, numpy
 # pal = planer.core(numpy)
@@ -19,7 +19,7 @@ x = (img/255.0).transpose(2, 0, 1)
 x = x[None, :, :, :].astype('float32')
 x = pal.array(x)
 
-net = read_onnx('ESRGAN')
+net = read_net('ESRGAN')
 print('load done!')
 
 y = net(x)

@@ -3,7 +3,7 @@ sys.path.append('../../')
 import numpy
 import cupy
 import planer
-from planer import read_onnx, resize
+from planer import read_net, resize
 from imagenet_labels import classes
 from skimage import io
 from matplotlib import pyplot as plt
@@ -22,7 +22,7 @@ x = x[None, :, :, :].astype('float32')
 x = pal.array(x)
 x = resize(x, (224, 224))
 
-net = read_onnx('mobile')
+net = read_net('mobile')
 print('load done!')
 
 net(x)

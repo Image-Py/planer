@@ -5,8 +5,11 @@
 A powerful light-weight inference framework for CNN. The aim of planer is to provide efficient and adaptable inference environment for CNN model. Also in order to enlarge the application scope, we support ONNX format, which enables the converting of trained model within various DL frameworks (PyTorch).  
 
 ## Features
-* Extremely streamlined IR
-* [CuPy](https://github.com/cupy/cupy) based GPU-oriented array computing ability
+
+Planer is a light -weight CNN framework implemented in pure Numpy-like interface. It can run only with Numpy. Or change different backends. (Cupy accelerated with CUDA, ClPy accelerated with OpenCL).
+
+* Implemented in pure Numpy-like interface. 
+* Extremely streamlined IR based on json
 * Powerful model visualization tools
 * ONNX supported model converting
 * Plenty of inspiring demos
@@ -52,9 +55,37 @@ net = Net()
 net.load_json(layer, flow)
 ```
 
-* ONNX-converted (all the demos)
+## Converted from onnx (torch)
 
-A example of converting torchvision resnet18 model can be seen in ```planer_onnx/``` folder. 
+It is easy to convert a net from torch after training (through onnx). Here is a demo with resnet18.
+
+``` python
+from torchvision.models import resnet18
+import torch
+from planer import torch2planer
+
+net = resnet18(pretrained=True)
+x = torch.randn(1, 3, 224, 224, device='cpu')
+torch2planer(net, 'resnet18', x)
+
+# then you will get a resnet18.json and resnet18.npy in current folder.
+
+from planer import read_net
+net = read_net('resnet18')
+net(x) # use the net to predict youre data
+```
+
+## Change backend
+
+Planer is based on Numpy-like interface. So it is easy to change backend to Cupy or ClPy. 
+
+```python
+import planer, cupy
+planer.core(cupy) # use cupy as backend
+
+import planer, clpy
+planer.core(clpy) # use clpy as backend
+```
 
 ## Network visualization
 
@@ -68,8 +99,6 @@ We have released some demos, which can be investigated inside ```demo/``` folder
 
 ![](resources/demos.png)
 
+## Planer-pro
 
-
-
-
-
+Planer is our open source version framework, We also have a professional version. (several times faster then torch)

@@ -43,13 +43,13 @@ class Net:
             body = ['self.layer = [']
             for i in self.body:
                 body.append('\t("%s", %s, %s),' % (i[0],
-                                                   i[1].__class__.__name__, i[1].para()))
+                    i[1].__class__.__name__, i[1].para()))
             body.append(']')
         if style == 'self':
             body = []
             for i in self.body:
                 body.append('self.%s = %s%s' % (i[0],
-                                                i[1].__class__.__name__, i[1].para() or ()))
+                    i[1].__class__.__name__, i[1].para() or ()))
         return '\n'.join(body)
 
     def layer2json(self):
@@ -81,10 +81,8 @@ class Net:
 
     def load_weights(self, data):
         s = 0
-        # data = np.array(data)
         for i in self.body:
             s += i[1].load(data[s:])
-        # del data
 
     def show(self, info=True):
         from .plot import plot_net

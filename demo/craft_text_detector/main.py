@@ -1,13 +1,12 @@
 import sys
 sys.path.append('../../')
-import cupy as cp
+#import cupy as cp
 from time import time
 from skimage import io, transform
 from matplotlib import pyplot as plt
-import cupy
 import numpy
 import planer
-from planer import read_onnx, resize
+from planer import read_net, resize
 
 # get planer array library, numpy
 # pal = planer.core(numpy)
@@ -35,11 +34,11 @@ x = normalize(img_).transpose(2, 0, 1)[None, :, :, :].copy()
 x = makesize32(x)
 
 # 2 files needed, craft.txt, craft.npy
-net = read_onnx('craft')
+net = read_net('craft')
 print('load done!')
 
 y = net(x)
-'''
+
 net.timer = {}
 start = time()
 print('start timing!')
@@ -65,4 +64,4 @@ plt.imshow(y[0, 1, :, :])
 plt.title('link map:%.3fs' % (runtime))
 
 plt.show()
-'''
+

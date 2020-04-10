@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 import numpy
 import cupy
 import planer
-from planer import read_onnx, resize
+from planer import read_net, resize
 
 
 # get planer array library, numpy
@@ -36,7 +36,7 @@ x = makesize32(x[None, :, :, :])
 
 
 # 2 files needed, hed.txt, hed.npy
-net = read_onnx('hed')
+net = read_net('hed')
 y = net(x)
 net.timer = {}
 print('start timing!')
