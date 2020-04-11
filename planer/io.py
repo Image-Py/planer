@@ -122,6 +122,7 @@ def read_onnx(path):
     return body, flow
 
 def get_weight(module):
+    import torch
     from torch import nn
     weights = []  
     for m in module.modules():
@@ -139,9 +140,13 @@ def get_weight(module):
 
 def torch2planer(net, name, x, in_name=None, out_name=None):
     import torch
+    import sys
     np.save(name+'.npy', get_weight(net))
-    torch.onnx.export(net, x, name+'.txt', verbose=True,
+    stdout = sys.stdout
+    sys.stdout = open(name+'.txt', 'w')
+    torch.onnx.export(net, x, 'useless.onnx', verbose=True,
         input_names=in_name, output_names=out_name)
+    sys.stdout = stdout
     body, flow = read_onnx(name)
     with open(name+'.json', 'w') as jsfile:
         json.dump({'layers':body, 'flow':flow}, jsfile)
