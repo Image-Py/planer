@@ -148,5 +148,6 @@ def torch2planer(net, name, x, in_name=None, out_name=None):
         input_names=in_name, output_names=out_name)
     sys.stdout = stdout
     body, flow = read_onnx(name)
+    # the json file is needed
     with open(name+'.json', 'w') as jsfile:
         json.dump({'layers':body, 'flow':flow}, jsfile)

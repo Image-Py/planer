@@ -89,9 +89,9 @@ class LeakyReLU(Layer):
         self.alpha = alpha
 
     def forward(self, x):
-        x[x < 0] *= self.alpha
-        return x
-
+        row = np.array([1, self.alpha], dtype=np.float32)
+        rst = x.reshape((-1,1)) * row
+        return rst.max(axis=1).reshape(x.shape)
 
 class Flatten(Layer):
     name = 'flatten'
@@ -193,7 +193,8 @@ class Mul(Layer):
     def __init__(self): pass
 
     def forward(self, x):
-        return x[0] * x[1]
+        x[1] *= x[0]
+        return x[1]
 
 
 class Const(Layer):
@@ -203,6 +204,7 @@ class Const(Layer):
 
     def forward(self, x): return self.v
 
+
 class Return(Layer):
     name = 'return'
 
@@ -211,7 +213,6 @@ class Return(Layer):
     def forward(self, x):
         return x
     
-
 
 class BatchNorm(Layer):
     name = 'batchnorm'
