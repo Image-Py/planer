@@ -6,7 +6,7 @@ A powerful light-weight inference framework for CNN. The aim of planer is to pro
 
 ## Features
 
-Planer is a light -weight CNN framework implemented in pure Numpy-like interface. It can run only with Numpy. Or change different backends. (Cupy accelerated with CUDA, ClPy accelerated with OpenCL).
+Planer is a light-weight CNN framework implemented in pure Numpy-like interface. It can run only with Numpy. Or change different backends. (Cupy accelerated with CUDA, ClPy accelerated with OpenCL).
 
 * Implemented in pure Numpy-like interface. 
 * Extremely streamlined IR based on json
