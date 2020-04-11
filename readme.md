@@ -2,7 +2,7 @@
 
 ![](logo.png)
 
-A powerful light-weight inference framework for CNN. The aim of planer is to provide efficient and adaptable inference environment for CNN model. Also in order to enlarge the application scope, we support ONNX format, which enables the converting of trained model within various DL frameworks (PyTorch).  
+A powerful light-weight inference framework for CNN. The aim of planer is to provide efficient and adaptable inference environment for CNN model. Also in order to enlarge the application scope, we support ONNX format, which enables the converting of trained model within various DL frameworks.  
 
 ## Features
 
@@ -55,7 +55,7 @@ net = Net()
 net.load_json(layer, flow)
 ```
 
-## Converted from onnx (torch)
+## Converted from onnx (pytorch 1.1.0)
 
 It is easy to convert a net from torch after training (through onnx). Here is a demo with resnet18.
 
