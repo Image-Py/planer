@@ -71,6 +71,12 @@ torch2planer(net, 'resnet18', x)
 # then you will get a resnet18.json and resnet18.npy in current folder.
 
 from planer import read_net
+import planer
+import numpy as np
+
+# get the planer array lib
+pal = planer.core(np)
+x = pal.random.randn(1, 3, 224, 224).astype('float32')
 net = read_net('resnet18')
 net(x) # use the net to predict youre data
 ```
