@@ -109,4 +109,4 @@ We have released some demos, which can be investigated inside ```demo/``` folder
 
 ## Planer-pro
 
-Planer is our open source version framework, We also have a professional version. (several times faster then torch)
+Planer is our open source version framework, We also have a professional edition (several times faster than torch).
