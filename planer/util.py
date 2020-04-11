@@ -11,16 +11,16 @@ def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1)):
     (strh, strw), (dh, dw) = stride, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
     cimg_w = c * h * w * group
-    cimg_h, imgs = ni*(hi//strh)*(wi//strw), []
+    cimg_h, i = ni*(hi//strh)*(wi//strw), 0
     shp = ((0, 0), (0, 0), (dh*(h//2),)*2, (dw*(w//2),)*2)
     img = pad(img, shp, 'constant', constant_values=0)
+    img = img.transpose((2,3,0,1)).copy()
+    col_img = np.zeros((w*h, hi//strh, wi//strw, ni, ci), img.dtype)
     for r in range(0, h*dh, dh):
         for c in range(0, w*dw, dw):
-            imgs.append(img[:,:,0+r:hi+r:strh, 0+c:wi+c:strw])
-    imgs = [i[:,:,:,:,None] for i in imgs]
-    col_img = imgs[0] if len(imgs)==1 else np.concatenate(imgs, -1)
-    col_img.shape = (ni, group, ci, cimg_h, -1, w*h)
-    col_img = col_img.transpose((0,1,3,4,2,5))
+            col_img[i], i = img[0+r:hi+r:strh, 0+c:wi+c:strw], i+1
+    col_img.shape = (w*h, cimg_h, -1, ni, group, ci)
+    col_img = col_img.transpose((3,4,1,2,5,0))
     col_core = core.reshape((group, core.shape[0]//group, -1))
     col_img = col_img.reshape((group, -1, cimg_w//group))
     rst = [i.dot(j.T) for i, j in zip(col_core, col_img)]
