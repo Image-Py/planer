@@ -1,6 +1,6 @@
 import json, re, os
 import numpy as np
-#from .net import Net
+from .net import Net
 from time import time
 import json
 
