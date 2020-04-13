@@ -80,7 +80,7 @@ def make_upmat(k):
     krb = (cs * rs).reshape((1,-1))
     return np.vstack([klt, krt, klb, krb])
     
-def upsample(img, k, matbuf={}):    
+def upsample_blinear(img, k, matbuf={}):    
     n, c, h, w = img.shape
     img = (img[:,:,:1,:], img, img[:,:,-1:,:])
     img = np.concatenate(img, axis=2)
@@ -97,4 +97,16 @@ def upsample(img, k, matbuf={}):
     rst = rst.reshape((n,c,(h+1)*k, (w+1)*k))
     return rst[:,:,k//2:-k//2,k//2:-k//2]
 
-if __name__ == '__main__': print('100 lines util') 
+def upsample_nearest(img, k):
+    n, c, h, w = img.shape
+    rst = np.zeros((n, c, h, k, w, k))
+    trst = rst.transpose((0,1,2,4,3,5))
+    trst[:] = img[:,:,:,:,None,None]
+    return rst.reshape((n, c, h*k, w*k))
+
+def upsample(img, k, mode):
+    if mode=='nearest': return upsample_nearest(img, k)
+    if mode=='linear': return upsample_blinear(img, k)
+
+if __name__ == '__main__': 
+    print('100 lines util') 

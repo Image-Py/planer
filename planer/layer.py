@@ -89,9 +89,10 @@ class LeakyReLU(Layer):
         self.alpha = alpha
 
     def forward(self, x):
-        row = np.array([1, self.alpha], dtype=np.float32)
-        rst = x.reshape((-1,1)) * row
-        return rst.max(axis=1).reshape(x.shape)
+        xalpha = x * self.alpha
+        x2 = np.array([x, xalpha])
+        x2 = x2.reshape((2,-1)).max(axis=0)
+        return x2.reshape(x.shape)
 
 class Flatten(Layer):
     name = 'flatten'
@@ -159,13 +160,14 @@ class GlobalAveragePool(Layer):
 class UpSample(Layer):
     name = 'upsample'
 
-    def __init__(self, k):
+    def __init__(self, k, mode):
         self.k = k
+        self.mode = mode
 
     def para(self): return (self.k,)
 
     def forward(self, x):
-        return upsample(x, self.k)
+        return upsample(x, self.k, self.mode)
 
 
 class Concatenate(Layer):

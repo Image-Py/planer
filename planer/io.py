@@ -1,6 +1,6 @@
 import json, re, os
 import numpy as np
-from .net import Net
+#from .net import Net
 from time import time
 import json
 
@@ -41,7 +41,7 @@ maxpool = re.compile(
 avgpool = re.compile(
     r'.*%.+?Pad.+?\n.+?%(.+?) .+?(AveragePool).+?kernel_shape=(\[\d+?, \d+?\]).+?strides=(\[\d+?, \d+?\]).+?\(%(.+?)\).+?\n')
 upsample = re.compile(
-    r'.*%.+? .+?Constant\[value=.+?(\d+\.?\d*) \[.+?\n.+?%(.+?) .+?(Upsample).+?\(%(.+?),.+?\n')
+    r'.*%.+? .+?Constant\[value=.+?(\d+\.?\d*) \[.+?\n.+?%(.+?) .+?(Upsample)\[mode="(.+?)"\]\(%(.+?),.+?\n')
 flatten = re.compile(
     r'.*%.+?Constant.+?\n.+?Shape.+?\n.+?Gather.+?\n.+?Constant.+?\n.+?Unsqueeze.+?\n.+?Unsqueeze.+?\n.+?Concat.+?\n.+?%(.+?) .+?(Reshape)\(%(.+?),.+?\n')
 dense = re.compile(r'.*%(.+?) .+?(Gemm).+(\(%.+?, %.+?, %.+?\)).+?\n')
@@ -112,7 +112,7 @@ def read_onnx(path):
             body.append(('maxpool_%s' % num, 'maxpool', [i[2][0], i[3][0]]))
             flow.append((i[4], ['maxpool_%s' % num], i[0]))
         elif i[2] == 'Upsample':
-            body.append(('upsample_%s' % num, 'upsample', [int(float(i[0]))]))
+            body.append(('upsample_%s' % num, 'upsample', [int(float(i[0])), i[3]]))
             flow.append((i[3], ['upsample_%s' % num], i[1]))
         elif i[1] == 'BatchNormalization':
             body.append(('batchnorm_%s' % num, 'batchnorm', [key[i[2][1]][0]]))
@@ -158,4 +158,4 @@ def torch2planer(net, name, x, in_name=None, out_name=None):
         json.dump({'layers':body, 'flow':flow}, jsfile)
 
 if __name__ == '__main__':
-    a, b = read_onnx('mask')
+    a, b = read_onnx('../demo/yolov3-planer-2/yolov3')
