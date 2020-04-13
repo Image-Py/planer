@@ -63,12 +63,17 @@ def read_onnx(path):
     cont = [eval(i) for i in cont.split('\n') if len(i) > 0 and i[0] in '[']
     cont = [[eval(j) if (',' in j) else j for j in i] for i in cont]        
 
-    body, flow, key = [], [], {}
+    body, flow, key, same = [], [], {},{}
     for i in cont:
         num = len(body)
         if len(i) == 2:
             key[i[0]] = i[1]
         elif i[1] == 'Conv':
+            name = i[5][1]+'-'+i[5][2]
+            if name in same:
+                flow.append((i[5][0], [same[name]], i[0]))
+                continue
+            same[name] = 'conv_%s' % num
             shp = [key[i[5][1]][j]
                 for j in (1, 0, 2)] + [int(i[3]), i[4][0], i[2][0]]
             body.append(('conv_%s' % num, 'conv', shp))
@@ -151,3 +156,6 @@ def torch2planer(net, name, x, in_name=None, out_name=None):
     # the json file is needed
     with open(name+'.json', 'w') as jsfile:
         json.dump({'layers':body, 'flow':flow}, jsfile)
+
+if __name__ == '__main__':
+    a, b = read_onnx('mask')

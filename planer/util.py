@@ -19,7 +19,7 @@ def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1)):
     for r in range(0, h*dh, dh):
         for c in range(0, w*dw, dw):
             col_img[i], i = img[0+r:hi+r:strh, 0+c:wi+c:strw], i+1
-    col_img.shape = (w*h, cimg_h, -1, ni, group, ci)
+    col_img.shape = (w*h, cimg_h, -1, ni, group, ci//group)
     col_img = col_img.transpose((3,4,1,2,5,0))
     col_core = core.reshape((group, core.shape[0]//group, -1))
     col_img = col_img.reshape((group, -1, cimg_w//group))
