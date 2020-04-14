@@ -107,6 +107,11 @@ We have released some demos, which can be investigated inside ```demo/``` folder
 
 ![](demo/demos.png)
 
+## Milestone
+Yolo-v3 is supported now!
+
+![](https://user-images.githubusercontent.com/36396315/79184976-40e95500-7e48-11ea-9679-a70074c658cf.png)
+
 ## Planer-pro
 
 Planer is our open source version framework, We also have a professional edition (several times faster than torch).
