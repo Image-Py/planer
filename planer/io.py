@@ -113,7 +113,7 @@ def read_onnx(path):
             flow.append((i[4], ['maxpool_%s' % num], i[0]))
         elif i[2] == 'Upsample':
             body.append(('upsample_%s' % num, 'upsample', [int(float(i[0])), i[3]]))
-            flow.append((i[3], ['upsample_%s' % num], i[1]))
+            flow.append((i[4], ['upsample_%s' % num], i[1]))
         elif i[1] == 'BatchNormalization':
             body.append(('batchnorm_%s' % num, 'batchnorm', [key[i[2][1]][0]]))
             flow.append((i[2][0], ['batchnorm_%s' % num, ], i[0]))
