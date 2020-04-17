@@ -1,6 +1,6 @@
 ## Planer: Powerful Light Artificial NEuRon
 
-![](logo.png)
+![](https://user-images.githubusercontent.com/36396315/79580952-57b7d200-80fc-11ea-9841-2b253f4e6293.png)
 
 A powerful light-weight inference framework for CNN. The aim of planer is to provide efficient and adaptable inference environment for CNN model. Also in order to enlarge the application scope, we support ONNX format, which enables the converting of trained model within various DL frameworks.  
 
@@ -105,7 +105,7 @@ We provide a powerful visualization tools for the cnn model. Just call ```net.sh
 ## Demos
 We have released some demos, which can be investigated inside ```demo/``` folder.
 
-![](demo/demos.png)
+![](https://user-images.githubusercontent.com/36396315/79580979-60100d00-80fc-11ea-8565-cd55f5db2395.png)
 
 ## Milestone
 Yolo-v3 is supported now!
