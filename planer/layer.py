@@ -236,7 +236,7 @@ class BatchNorm(Layer):
         self.m[:] = buf[2*c:3*c]
         self.v[:] = buf[3*c:4*c]
 
-        self.v_inv = 1/np.sqrt(self.v + 0.001)
+        self.v_inv = 1/np.sqrt(self.v + 1e-5)
         self.kmv_inv_b = -self.k*self.m*self.v_inv + self.b
         self.kv_inv = self.k*self.v_inv
         self.kmv_inv_b.shape = self.kv_inv.shape = (1,-1,1,1)
