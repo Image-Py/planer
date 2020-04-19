@@ -11,7 +11,7 @@ def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1)):
     (strh, strw), (dh, dw) = stride, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
     cimg_w = c * h * w * group
-    cimg_h, i = ni*(hi//strh)*(wi//strw), 0
+    cimg_h, i = (hi//strh)*(wi//strw), 0
     shp = ((0, 0), (0, 0), (dh*(h//2),)*2, (dw*(w//2),)*2)
     img = pad(img, shp, 'constant', constant_values=0)
     img = img.transpose((2,3,0,1)).copy()
@@ -25,7 +25,7 @@ def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1)):
     col_img = col_img.reshape((group, -1, cimg_w//group))
     rst = [i.dot(j.T) for i, j in zip(col_core, col_img)]
     rst = rst[0] if group==1 else np.concatenate(rst)
-    return rst.reshape((ni, n, hi//strh, wi//strw))
+    return rst.reshape((n, ni, hi//strh, wi//strw)).transpose(1, 0, 2, 3)
 
 def pool_nxn(img, f, s):
     n, c, h, w = img.shape
