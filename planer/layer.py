@@ -100,7 +100,7 @@ class Flatten(Layer):
     def __init__(self): pass
 
     def forward(self, x):
-        return x.reshape((1, -1))
+        return x.reshape((x.shape[0], -1))
 
 
 class Sigmoid(Layer):
