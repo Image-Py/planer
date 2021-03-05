@@ -189,6 +189,46 @@ class Add(Layer):
         return x[0]
 
 
+
+class Pow(Layer):
+    name = 'pow'
+    
+    def __init__(self): pass
+    
+    def forward(self, x):
+        return np.power(x[0], x[1])    
+    
+class Div(Layer):
+    name = 'div'
+    
+    def __init__(self): pass
+    
+    def forward(self, x):
+        return x[0]/x[1]
+
+class ReduceSum(Layer):
+    name = 'reducesum'
+    
+    def __init__(self, axis, keep_dim):
+        self.axis = axis
+        self.keep_dim = keep_dim
+    
+    def forward(self, x):
+        if self.keep_dim:
+            return np.expand_dims(x.sum(axis=self.axis), self.axis)
+        else:
+            return x.sum(axis=self.axis)
+
+class Unsqueeze(Layer):
+    name = 'unsqueeze'
+    
+    def __init__(self, dim):
+        self.dim = dim
+    
+    def forward(self, x):
+        return np.expand_dims(x, self.dim)
+
+
 class Mul(Layer):
     name = 'mul'
 
