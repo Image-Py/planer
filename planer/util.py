@@ -1,4 +1,5 @@
 import numpy as np
+from time import time
 
 def pad(img, shp, mode='constant', constant_values=0):
     if shp[2][0]==shp[2][1]==shp[3][0]==shp[3][1]==0: return img
@@ -7,6 +8,7 @@ def pad(img, shp, mode='constant', constant_values=0):
     newimg[:,:,mh[0]:-mh[1],mw[0]:-mw[1]] = img
     return newimg
 
+
 def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1)):
     (strh, strw), (dh, dw) = stride, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
@@ -14,17 +16,13 @@ def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1)):
     cimg_h, i = (hi//strh)*(wi//strw), 0
     shp = ((0, 0), (0, 0), (dh*(h//2),)*2, (dw*(w//2),)*2)
     img = pad(img, shp, 'constant', constant_values=0)
-    img = img.transpose((2,3,0,1)).copy()
-    col_img = np.zeros((w*h, hi//strh, wi//strw, ni, ci), img.dtype)
+    img = img.transpose((1,0,2,3)) # nchw -> cnhw
+    col_img = np.zeros((w*h, ci, ni, hi//strh, wi//strw), img.dtype) #(h*w, c, N, H, W)
     for r in range(0, h*dh, dh):
         for c in range(0, w*dw, dw):
-            col_img[i], i = img[0+r:hi+r:strh, 0+c:wi+c:strw], i+1
-    col_img.shape = (w*h, cimg_h, -1, ni, group, ci//group)
-    col_img = col_img.transpose((3,4,1,2,5,0))
-    col_core = core.reshape((group, core.shape[0]//group, -1))
-    col_img = col_img.reshape((group, -1, cimg_w//group))
-    rst = [i.dot(j.T) for i, j in zip(col_core, col_img)]
-    rst = rst[0] if group==1 else np.concatenate(rst)
+            col_img[i], i = img[:,:,0+r:hi+r:strh, 0+c:wi+c:strw], i+1
+    col_core = core.transpose((0, 2, 3, 1)).reshape(core.shape[0], -1)
+    rst = col_core.dot(col_img.reshape(cimg_w, -1))
     return rst.reshape((n, ni, hi//strh, wi//strw)).transpose(1, 0, 2, 3)
 
 def pool_nxn(img, f, s):
@@ -35,21 +33,19 @@ def pool_nxn(img, f, s):
     if f == 'mean': return rshp.mean(axis=(4,5))
 
 def pool(img, f, core=(2, 2), stride=(2, 2)):
-    if core[0] == core[1] == stride[0] == stride[1]:
-        return pool_nxn(img, f, core[0])
     (n, c, h, w), (ch, cw), (strh, strw) = img.shape, core, stride
     shp = ((0, 0), (0, 0), ((ch-1)//2,)*2, ((cw-1)//2,)*2)
     img = pad(img, shp, 'constant', constant_values=0)
     (imn, ic, ih, iw), imgs = img.shape, []
+    buf = np.zeros(img.shape[:2]+(h//strh,w//strw), np.float32)
+    buf -= 1e4
     for r in range(0, ch, 1):
         for c in range(0, cw, 1):
-            imgs.append(img[:,:,r:h+r:strh,c:w+c:strw])
-    imgs = [i[:,:,:,:,None] for i in imgs]
-    col_img = np.concatenate(imgs, axis=-1)
-    if f == 'max': return col_img.max(axis=-1)
-    if f == 'mean': return col_img.mean(axis=-1)
+            f(img[:,:,r:h+r:strh,c:w+c:strw], buf, out=buf)
+    return buf
 
-def maxpool(i, c=(2, 2), s=(2, 2)): return pool(i, 'max', c, s)
+
+def maxpool(i, c=(2, 2), s=(2, 2)):return pool(i, np.maximum, c, s)
 
 def avgpool(i, c=(2, 2), s=(2, 2)): return pool(i, 'mean', c, s)
     
@@ -72,7 +68,7 @@ def resize(img, size):
     return result.reshape(nc + size)
 
 def make_upmat(k):
-    xs = np.linspace(0.5/k, 1-0.5/k, k*1)
+    xs = np.linspace(0.5/k, 1-0.5/k, k*1, dtype=np.float32)
     rs, cs = xs[:,None], xs[None,:]
     klt = ((1-cs)*(1-rs)).reshape((1,-1))
     krt = (cs * (1-rs)).reshape((1,-1))
@@ -99,7 +95,7 @@ def upsample_blinear(img, k, matbuf={}):
 
 def upsample_nearest(img, k):
     n, c, h, w = img.shape
-    rst = np.zeros((n, c, h, k, w, k))
+    rst = np.zeros((n, c, h, k, w, k), dtype=np.float32)
     trst = rst.transpose((0,1,2,4,3,5))
     trst[:] = img[:,:,:,:,None,None]
     return rst.reshape((n, c, h*k, w*k))
@@ -108,5 +104,6 @@ def upsample(img, k, mode):
     if mode=='nearest': return upsample_nearest(img, k)
     if mode=='linear': return upsample_blinear(img, k)
 
-if __name__ == '__main__': 
-    print('100 lines util') 
+
+if __name__ == '__main__':
+    pass

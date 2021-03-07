@@ -41,23 +41,28 @@ maxpool = re.compile(
 avgpool = re.compile(
     r'.*%.+?Pad.+?\n.+?%(.+?) .+?(AveragePool).+?kernel_shape=(\[\d+?, \d+?\]).+?strides=(\[\d+?, \d+?\]).+?\(%(.+?)\).+?\n')
 upsample = re.compile(
-    r'.*%.+? .+?Constant\[value=.+?(\d+\.?\d*) \[.+?\n.+?%(.+?) .+?(Upsample)\[mode="(.+?)"\]\(%(.+?),.+?\n')
-flatten = re.compile(
-    r'.*%.+?Constant.+?\n.+?Shape.+?\n.+?Gather.+?\n.+?Constant.+?\n.+?Unsqueeze.+?\n.+?Unsqueeze.+?\n.+?Concat.+?\n.+?%(.+?) .+?(Reshape)\(%(.+?),.+?\n')
+    r'.*%(.+?) .+?(Upsample)\[mode="(.+?)"\](\(%.+?, %.+?\)).+?\n')   
+unsqueeze = re.compile(r'.*%(.+?) .+?(Unsqueeze)\[axes=(\[.+?\])\]\(%(.+?)\).+?\n')
+flatten = re.compile(r'.*%(.+?) .+?(Flatten)\[axis=(\d+?)\]\(%(.+?)\).+?\n')
 dense = re.compile(r'.*%(.+?) .+?(Gemm).+(\(%.+?, %.+?, %.+?\)).+?\n')
 concat = re.compile(r'.*%(.+?) .+?(Concat).+(\(%.+?\)).+?\n')
 batchnorm = re.compile(r'.*%(.+?) .+?(BatchNormalization).+?(\(.+?\)).+?\n')
 add = re.compile(r'.*%(.+?) .+?(Add)(\(%.+?\)).+?\n')
+pow = re.compile(r'.*%(.+?) .+?(Pow)(\(%.+?\)).+?\n')
+div = re.compile(r'.*%(.+?) .+?(Div)(\(%.+?\)).+?\n')
+reducesum = re.compile(r'.*%(.+?) .+?(ReduceSum)\[axes=(\[.+?\]), keepdims=(\d+?)\]\(%(.+?)\).+?\n')
 mul = re.compile(r'.*%(.+?) .+?(Mul)(\(%.+?\))\n')
 const = re.compile(r'.*%(.+?) .+?(Constant).*value=\{(.+?)\}.+?\n')
 weight = re.compile(r'.*%(.+?) .+?(\(.*?\)).*\n')
 output = re.compile(r'.*(return) (\(%.+?\))')
 
 res = (flatten, upsample, conv, relu, leakyrelu, gap, sigmoid, maxpool,
-       avgpool, dense, concat, add, mul, const, batchnorm, weight, output)
+       avgpool, dense, unsqueeze, reducesum, concat, pow, add, mul, div, const, batchnorm, weight, output)
 
 def read_onnx(path):
     with open(path+'.txt') as f: cont = f.read()
+    cont = re.compile(r'\d+?:\d+').sub(lambda x:x.group(0).split(':')[0], cont)
+    cont = re.compile(r'(, )?requires_grad=\d|(, )?device=cpu').sub('', cont)
     for i in res: cont = i.sub(parse, cont)
     # for i in cont.split('\n'): print(i)
     cont = [eval(i) for i in cont.split('\n') if len(i) > 0 and i[0] in '[']
@@ -96,9 +101,15 @@ def read_onnx(path):
         elif i[1] == 'Add':
             body.append(('add_%s' % num, 'add', None))
             flow.append((i[2], ['add_%s' % num], i[0]))
+        elif i[1] == 'Pow':
+            body.append(('pow_%s' % num, 'pow', None))
+            flow.append((i[2], ['pow_%s' % num], i[0]))
         elif i[1] == 'Mul':
             body.append(('mul_%s' % num, 'mul', None))
             flow.append((i[2], ['mul_%s' % num], i[0]))
+        elif i[1] == 'Div':
+            body.append(('div_%s' % num, 'div', None))
+            flow.append((i[2], ['div_%s' % num], i[0]))
         elif i[1] == 'Constant':
             body.append(('const_%s' % num, 'const', [float(i[2])]))
             flow.append(('None', ['const_%s' % num], i[0]))
@@ -111,15 +122,21 @@ def read_onnx(path):
         elif i[1] == 'MaxPool':
             body.append(('maxpool_%s' % num, 'maxpool', [i[2][0], i[3][0]]))
             flow.append((i[4], ['maxpool_%s' % num], i[0]))
-        elif i[2] == 'Upsample':
-            body.append(('upsample_%s' % num, 'upsample', [int(float(i[0])), i[3]]))
-            flow.append((i[4], ['upsample_%s' % num], i[1]))
+        elif i[1] == 'Upsample':
+            body.append(('upsample_%s' % num, 'upsample', [2, i[2]]))
+            flow.append((i[3][0], ['upsample_%s' % num], i[0]))
         elif i[1] == 'BatchNormalization':
             body.append(('batchnorm_%s' % num, 'batchnorm', [key[i[2][1]][0]]))
             flow.append((i[2][0], ['batchnorm_%s' % num, ], i[0]))
-        elif i[1] == 'Reshape':
+        elif i[1] == 'Flatten':
             body.append(('flatten_%s' % num, 'flatten', None))
-            flow.append((i[2], ['flatten_%s' % num], i[0]))
+            flow.append((i[3], ['flatten_%s' % num], i[0]))
+        elif i[1] == 'Unsqueeze':
+            body.append(('unsqueeze_%s' % num, 'unsqueeze', [eval(i[2])]))
+            flow.append((i[3], ['unsqueeze_%s' % num], i[0]))
+        elif i[1] == 'ReduceSum':
+            body.append(('reducesum_%s' % num, 'reducesum', [eval(i[2]), int(i[3])]))
+            flow.append((i[4], ['reducesum_%s' % num], i[0]))
         elif i[1] == 'return':
             body.append(('return_%s' % num, 'return', None))
             out = i[2] if len(i[2])>1 else i[2][0]

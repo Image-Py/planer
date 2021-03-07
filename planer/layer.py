@@ -79,8 +79,8 @@ class ReLU(Layer):
     def __init__(self): pass
 
     def forward(self, x):
-        return np.clip(x, 0, 1e8)
-
+        #return np.maximum(x, 0, out=x)
+        msk = x>0; x *= msk; return x
 
 class LeakyReLU(Layer):
     name = 'leakyrelu'
@@ -267,7 +267,10 @@ class BatchNorm(Layer):
         self.v = np.zeros(c, dtype=np.float32)
 
     def forward(self, x):
-        return self.kv_inv*x + self.kmv_inv_b
+        x = x * self.kv_inv
+        x += self.kmv_inv_b
+        return x
+        #return self.kv_inv*x + self.kmv_inv_b
 
     def load(self, buf):
         c = self.c
@@ -286,7 +289,8 @@ class BatchNorm(Layer):
 
 layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU, 'leakyrelu': LeakyReLU, 'batchnorm': BatchNorm,
              'flatten': Flatten, 'sigmoid': Sigmoid, 'softmax': Softmax, 'maxpool': Maxpool, 'avgpool': Avgpool, 'const': Const,
-             'upsample': UpSample, 'concat': Concatenate, 'add': Add, 'mul': Mul, 'gap': GlobalAveragePool, 'return':Return}
+             'upsample': UpSample, 'concat': Concatenate, 'add': Add, 'mul': Mul, 'gap': GlobalAveragePool, 'pow':Pow,
+             'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 'return':Return}
 
 if __name__ == "__main__":
     pass
