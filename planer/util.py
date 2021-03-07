@@ -17,12 +17,14 @@ def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1)):
     shp = ((0, 0), (0, 0), (dh*(h//2),)*2, (dw*(w//2),)*2)
     img = pad(img, shp, 'constant', constant_values=0)
     img = img.transpose((1,0,2,3)) # nchw -> cnhw
-    col_img = np.zeros((w*h, ci, ni, hi//strh, wi//strw), img.dtype) #(h*w, c, N, H, W)
+    col_img = np.zeros((ci, w*h,  ni, hi//strh, wi//strw), img.dtype) #(h*w, c, N, H, W)
     for r in range(0, h*dh, dh):
         for c in range(0, w*dw, dw):
-            col_img[i], i = img[:,:,0+r:hi+r:strh, 0+c:wi+c:strw], i+1
-    col_core = core.transpose((0, 2, 3, 1)).reshape(core.shape[0], -1)
-    rst = col_core.dot(col_img.reshape(cimg_w, -1))
+            col_img[:,i], i = img[:,:,0+r:hi+r:strh, 0+c:wi+c:strw], i+1
+    col_core = core.reshape((group, core.shape[0]//group, -1))
+    col_img.shape = (group, cimg_w//group, -1)
+    rst = [i.dot(j) for i, j in zip(col_core, col_img)]
+    rst = rst[0] if group==1 else np.concatenate(rst)
     return rst.reshape((n, ni, hi//strh, wi//strw)).transpose(1, 0, 2, 3)
 
 def pool_nxn(img, f, s):
