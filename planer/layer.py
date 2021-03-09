@@ -1,5 +1,6 @@
 from .util import conv, maxpool, upsample, avgpool, np
 
+
 class Layer:
     name = 'layer'
 
@@ -189,14 +190,14 @@ class Add(Layer):
         return x[0]
 
 
-
 class Pow(Layer):
     name = 'pow'
     
-    def __init__(self): pass
+    def __init__(self, n): self.n = n
     
     def forward(self, x):
-        return np.power(x[0], x[1])    
+        return np.power(x, self.n)
+
     
 class Div(Layer):
     name = 'div'
@@ -283,7 +284,6 @@ class BatchNorm(Layer):
         self.kmv_inv_b = -self.k*self.m*self.v_inv + self.b
         self.kv_inv = self.k*self.v_inv
         self.kmv_inv_b.shape = self.kv_inv.shape = (1,-1,1,1)
-
         return self.c * 4
 
 

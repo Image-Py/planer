@@ -15,6 +15,7 @@ shape = {'conv': '^', 'relu': 'p', 'maxp': 'h', 'upsa': 'o', 'dense': 'o', 'pool
 def plot_net(body, flow, text=True, nots_colors=colors, nodes_size=size, nodes_shape=shape):
     # read the input/output layer's name(input or input1)
     str_input, str_output = flow[0][0], flow[-1][-1]
+    # print(str_input, str_output)
     G = nx.DiGraph()
     dic = {str_input: str_input, 'x': 'x', 'y': 'y'}
     G.add_node(str_input)
@@ -23,7 +24,7 @@ def plot_net(body, flow, text=True, nots_colors=colors, nodes_size=size, nodes_s
         dic[i[2]] = i[1][-1]
         G.add_node(dic[i[2]])
         # multi-input
-        if isinstance(i[0], tuple):
+        if isinstance(i[0], list):
             for j in i[0]:
                 G.add_edge(dic[j], i[1][0])
         else:
@@ -50,7 +51,7 @@ def plot_net(body, flow, text=True, nots_colors=colors, nodes_size=size, nodes_s
         G, pos, nodelist=[str_input, str_output], node_color='red')
 
     edges = nx.draw_networkx_edges(
-        G, pos, edges_color='olive', arrowstyle='->', arrowsize=10)
+        G, pos,  arrowstyle='->', arrowsize=10)
 
     nx.draw_networkx_labels(G, pos, font_size=8,
         labels={i: i.split('_')[0] for i in G}, font_family='sans-serif')

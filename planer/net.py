@@ -4,30 +4,35 @@ from .util import np
 
 class Net:
     def __init__(self):
-        self.body = []
-        self.cmds = []
-        self.timer = {}
+        self.body, self.flow = [], []
+        self.life, self.timer = {}, {}
 
-    def load_json(self, body, cmds):
+    def load_json(self, body, flow):
+        self.body, self.flow, self.life = [], [], {}
         for i in body:
             para = i[2] or []
             self.body.append((i[0], key[i[1]](*para)))
-        self.cmds = cmds
-
-        # for better naming
-        self.layer = body
-        self.flow = cmds
+        for i in range(len(flow)):
+            keys = flow[i][0]
+            if isinstance(keys, str): keys = [keys]
+            for j in keys: self.life[j] = i
+            
+        self.layer, self.flow = body, flow
 
     def forward(self, x):
         dic = dict(self.body)
-        rst = {self.cmds[0][0]: x, 'None': None}
-        for x, ls, y in self.cmds:
+        rst = {self.flow[0][0]: x, 'None': None}
+        for i in range(len(self.flow)):
+            x, ls, y = self.flow[i]
+            if not isinstance(ls, list): ls = [ls]
             for l in ls:
                 out = x if l == ls[0] else y
                 if not isinstance(out, str):
                     p = [rst[i] for i in out]
-                else:
-                    p = rst[out]
+                else: p = rst[out]
+                xs = x if isinstance(x, list) else [x]
+                for k in xs: # release wasted obj
+                    if self.life[k]<=i: del rst[k]
                 obj = dic[l]
                 start = time()
                 rst[y] = obj(p)
@@ -83,6 +88,7 @@ class Net:
         s = 0
         for i in self.body:
             s += i[1].load(data[s:])
+
 
     def show(self, info=True):
         from .plot import plot_net

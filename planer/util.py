@@ -1,6 +1,8 @@
 import numpy as np
 from time import time
 
+#from concurrent.futures import ThreadPoolExecutor
+
 def pad(img, shp, mode='constant', constant_values=0):
     if shp[2][0]==shp[2][1]==shp[3][0]==shp[3][1]==0: return img
     (n, c, h, w), (mn, mc, mh, mw) = img.shape, shp
@@ -8,8 +10,8 @@ def pad(img, shp, mode='constant', constant_values=0):
     newimg[:,:,mh[0]:-mh[1],mw[0]:-mw[1]] = img
     return newimg
 
-
 def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1)):
+    #threadPool = ThreadPoolExecutor(max_workers=1)
     (strh, strw), (dh, dw) = stride, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
     cimg_w = c * h * w * group
@@ -18,9 +20,12 @@ def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1)):
     img = pad(img, shp, 'constant', constant_values=0)
     img = img.transpose((1,0,2,3)) # nchw -> cnhw
     col_img = np.zeros((ci, w*h,  ni, hi//strh, wi//strw), img.dtype) #(h*w, c, N, H, W)
+    #def set_value(img, i, v): img[:,i] = v
     for r in range(0, h*dh, dh):
         for c in range(0, w*dw, dw):
             col_img[:,i], i = img[:,:,0+r:hi+r:strh, 0+c:wi+c:strw], i+1
+            #threadPool.submit(set_value, col_img, i-1, im)
+    #threadPool.shutdown(wait=True)
     col_core = core.reshape((group, core.shape[0]//group, -1))
     col_img.shape = (group, cimg_w//group, -1)
     rst = [i.dot(j) for i, j in zip(col_core, col_img)]
@@ -108,4 +113,7 @@ def upsample(img, k, mode):
 
 
 if __name__ == '__main__':
-    pass
+    img = np.zeros((1, 64, 512, 512), dtype=np.float32)
+    core = np.zeros((32, 64, 3, 3), dtype=np.float32)
+
+    conv(img, core)
