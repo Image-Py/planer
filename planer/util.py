@@ -52,7 +52,7 @@ def maxpool(i, c=(2, 2), s=(2, 2)):
 
 def avgpool(i, c=(2, 2), s=(2, 2)):
     rst = pool(i, np.add, c, s, 0)
-    rst /= c[0] * c[1];
+    rst /= c[0] * c[1]
     return rst
     
 def resize(img, size):

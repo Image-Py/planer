@@ -47,6 +47,9 @@ def onnx2planer(path):
             layers.append([i.name, 'unsqueeze', [i.attribute[0].ints[0]]])
         elif i.op_type == 'Relu':
             layers.append([i.name, 'relu', None])
+        elif i.op_type == 'LeakyRelu':
+            alpha = i.attribute[0].f
+            layers.append([i.name, 'leakyrelu', [alpha]])
         elif i.op_type == 'Add':
             layers.append([i.name, 'add', None])
         elif i.op_type == 'Div':
@@ -60,6 +63,17 @@ def onnx2planer(path):
         elif i.op_type == 'ReduceSum':
             axis, keep = i.attribute[0].ints[0], i.attribute[1].i
             layers.append([i.name, 'reducesum', [axis, keep]])
+        elif i.op_type == 'Concat':
+            layers.append([i.name, 'concat', None])
+        elif i.op_type == 'Pad':
+            layers.append([i.name, 'identity', None])
+        elif i.op_type == 'AveragePool':
+            for attr in i.attribute:
+                if 'stride' in attr.name:
+                    s = attr.ints[0]
+                if 'kernel' in attr.name:
+                    w = attr.ints[0]
+            layers.append([i.name, 'avgpool', [w, s]])
         else:
             print('lost layer:', i.name)
             break
