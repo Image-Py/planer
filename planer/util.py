@@ -11,7 +11,6 @@ def pad(img, shp, mode='constant', constant_values=0):
     return newimg
 
 def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1)):
-    #threadPool = ThreadPoolExecutor(max_workers=1)
     (strh, strw), (dh, dw) = stride, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
     cimg_w = c * h * w * group
@@ -20,12 +19,9 @@ def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1)):
     img = pad(img, shp, 'constant', constant_values=0)
     img = img.transpose((1,0,2,3)) # nchw -> cnhw
     col_img = np.zeros((ci, w*h,  ni, hi//strh, wi//strw), img.dtype) #(h*w, c, N, H, W)
-    #def set_value(img, i, v): img[:,i] = v
     for r in range(0, h*dh, dh):
         for c in range(0, w*dw, dw):
             col_img[:,i], i = img[:,:,0+r:hi+r:strh, 0+c:wi+c:strw], i+1
-            #threadPool.submit(set_value, col_img, i-1, im)
-    #threadPool.shutdown(wait=True)
     col_core = core.reshape((group, core.shape[0]//group, -1))
     col_img.shape = (group, cimg_w//group, -1)
     rst = [i.dot(j) for i, j in zip(col_core, col_img)]
@@ -39,22 +35,25 @@ def pool_nxn(img, f, s):
     if f == 'max': return rshp.max(axis=(4,5))
     if f == 'mean': return rshp.mean(axis=(4,5))
 
-def pool(img, f, core=(2, 2), stride=(2, 2)):
+def pool(img, f, core=(2, 2), stride=(2, 2), const=0):
     (n, c, h, w), (ch, cw), (strh, strw) = img.shape, core, stride
     shp = ((0, 0), (0, 0), ((ch-1)//2,)*2, ((cw-1)//2,)*2)
     img = pad(img, shp, 'constant', constant_values=0)
     (imn, ic, ih, iw), imgs = img.shape, []
     buf = np.zeros(img.shape[:2]+(h//strh,w//strw), np.float32)
-    buf -= 1e4
+    if const != 0: buf[:] = const
     for r in range(0, ch, 1):
         for c in range(0, cw, 1):
             f(img[:,:,r:h+r:strh,c:w+c:strw], buf, out=buf)
     return buf
 
+def maxpool(i, c=(2, 2), s=(2, 2)):
+    return pool(i, np.maximum, c, s, -1e4)
 
-def maxpool(i, c=(2, 2), s=(2, 2)):return pool(i, np.maximum, c, s)
-
-def avgpool(i, c=(2, 2), s=(2, 2)): return pool(i, 'mean', c, s)
+def avgpool(i, c=(2, 2), s=(2, 2)):
+    rst = pool(i, np.add, c, s, 0)
+    rst /= c[0] * c[1];
+    return rst
     
 def resize(img, size):
     nc, (h, w) = img.shape[:-2], img.shape[-2:]
@@ -113,7 +112,10 @@ def upsample(img, k, mode):
 
 
 if __name__ == '__main__':
+    '''
     img = np.zeros((1, 64, 512, 512), dtype=np.float32)
     core = np.zeros((32, 64, 3, 3), dtype=np.float32)
-
     conv(img, core)
+    '''
+    img = np.arange(4).reshape(1,1,2,2)
+    rst = avgpool(img)

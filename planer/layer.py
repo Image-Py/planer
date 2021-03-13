@@ -155,7 +155,7 @@ class GlobalAveragePool(Layer):
     def __init__(self): pass
 
     def forward(self, x):
-        return x.mean(axis=(-2, -1))
+        return x.mean(axis=(-2, -1), keepdims=True)
 
 
 class UpSample(Layer):
