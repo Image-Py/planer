@@ -39,22 +39,25 @@ def pool_nxn(img, f, s):
     if f == 'max': return rshp.max(axis=(4,5))
     if f == 'mean': return rshp.mean(axis=(4,5))
 
-def pool(img, f, core=(2, 2), stride=(2, 2)):
+def pool(img, f, core=(2, 2), stride=(2, 2), const=0):
     (n, c, h, w), (ch, cw), (strh, strw) = img.shape, core, stride
     shp = ((0, 0), (0, 0), ((ch-1)//2,)*2, ((cw-1)//2,)*2)
     img = pad(img, shp, 'constant', constant_values=0)
     (imn, ic, ih, iw), imgs = img.shape, []
     buf = np.zeros(img.shape[:2]+(h//strh,w//strw), np.float32)
-    buf -= 1e4
+    if const != 0: buf[:] = const
     for r in range(0, ch, 1):
         for c in range(0, cw, 1):
             f(img[:,:,r:h+r:strh,c:w+c:strw], buf, out=buf)
     return buf
 
+def maxpool(i, c=(2, 2), s=(2, 2)):
+    return pool(i, np.maximum, c, s, -1e4)
 
-def maxpool(i, c=(2, 2), s=(2, 2)):return pool(i, np.maximum, c, s)
-
-def avgpool(i, c=(2, 2), s=(2, 2)): return pool(i, 'mean', c, s)
+def avgpool(i, c=(2, 2), s=(2, 2)):
+    rst = pool(i, np.add, c, s, 0)
+    rst /= c[0] * c[1]
+    return rst
     
 def resize(img, size):
     nc, (h, w) = img.shape[:-2], img.shape[-2:]
