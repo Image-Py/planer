@@ -2,15 +2,25 @@ import json, re, os
 import numpy as np
 from .net import Net
 from time import time
-import json
+import json, zipfile
+from io import BytesIO
 
 def read_net(path):
     net = Net()
-    with open(path+'.json') as f:
-        body = json.load(f)
-        lay, flw = body['layers'], body['flow']
+    if os.path.exists(path+'.pla'):
+        with zipfile.ZipFile(path+'.pla') as f:
+            path = os.path.split(path)[1]
+            body = json.loads(f.read(path+'.json'))
+            lay, flw = body['layers'], body['flow']
+            buf = BytesIO(f.read(path+'.npy'))
+            weights = np.load(buf)
+    else:
+        with open(path+'.json') as f:
+            body = json.load(f)
+            lay, flw = body['layers'], body['flow']
+        weights = np.load(path+'.npy')
     net.load_json(lay, flw)
-    net.load_weights(np.load(path+'.npy'))
+    net.load_weights(weights)
     return net
 
 def onnx2planer(path):
@@ -85,6 +95,11 @@ def onnx2planer(path):
     np.save(path.replace('onnx', 'npy'), weights)
     with open(path.replace('onnx', 'json'), 'w') as f:
         json.dump({'layers':layers, 'flow':flows}, f)
+
+    with zipfile.ZipFile(path.replace('onnx', 'pla'), 'w') as f:
+        f.write(path.replace('onnx','json'))
+        f.write(path.replace('onnx','npy'))
+    
     
 
 def torch2planer(net, name, x, in_name=None, out_name=None):

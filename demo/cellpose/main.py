@@ -17,7 +17,7 @@ img = gravel()
 img = numpy.concatenate(([img], [img]))
 img = img.astype('float32')/255
 
-img = numpy.zeros((2,1024,1024), 'float32')
+#img = numpy.zeros((2,1024,1024), 'float32')
 img_ = pal.array(img)
 
 x = img_[None,:,:,:]
