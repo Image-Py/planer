@@ -24,6 +24,7 @@ def read_net(path):
     return net
 
 def onnx2planer(path):
+    print('here')
     import onnx, onnx.numpy_helper
     graph = onnx.load(path).graph
     layers, weights, flows, const, values = [], [], [], {}, {}
@@ -77,6 +78,8 @@ def onnx2planer(path):
             layers.append([i.name, 'concat', None])
         elif i.op_type == 'Pad':
             layers.append([i.name, 'identity', None])
+        elif i.op_type == 'Sigmoid':
+            layers.append([i.name, 'sigmoid', None])
         elif i.op_type == 'AveragePool':
             for attr in i.attribute:
                 if 'stride' in attr.name:
@@ -86,7 +89,7 @@ def onnx2planer(path):
             layers.append([i.name, 'avgpool', [w, s]])
         else:
             print('lost layer:', i.name)
-            break
+            return i
         
     layers.append(['return', 'return', None])
     flows.append([[i.name for i in graph.output], ['return'], 'plrst'])
