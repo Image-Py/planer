@@ -24,12 +24,12 @@ def read_net(path):
     return net
 
 def onnx2planer(path):
-    print('here')
     import onnx, onnx.numpy_helper
     graph = onnx.load(path).graph
     layers, weights, flows, const, values = [], [], [], {}, {}
     for i in graph.initializer: values[i.name] = onnx.numpy_helper.to_array(i)
     for i in graph.node:
+        # print(i.name)
         has = [i for i in i.input if i in values]
         no = [i for i in i.input if not i in values]
         if len(no)==1: no = no[0]
@@ -45,8 +45,8 @@ def onnx2planer(path):
         elif i.op_type == 'Gemm':
             layers.append([i.name, 'dense', list(weights[-2].shape[::-1])])
         elif i.op_type == 'MaxPool':
-            w, s = i.attribute[0].ints[0], i.attribute[2].ints[0]
-            layers.append([i.name, 'maxpool', [w, s]])
+            w, m, s = i.attribute[0].ints, i.attribute[1].ints, i.attribute[2].ints
+            layers.append([i.name, 'maxpool', [list(i) for i in [w, m[2:], s]]])
         elif i.op_type == 'GlobalAveragePool':
             layers.append([i.name, 'gap', None])
         elif i.op_type == 'Upsample':
@@ -67,7 +67,9 @@ def onnx2planer(path):
             layers.append([i.name, 'div', None])
         elif i.op_type == 'Constant':
             buf = i.attribute[0].t.raw_data
-            const[i.output[0]] = float(np.frombuffer(buf, 'float32'))
+            tp = i.attribute[0].t.data_type
+            tp, fmt = [(int, 'int64'), (float, 'float32')][tp==1]
+            const[i.output[0]] = tp(np.frombuffer(buf, fmt))
         elif i.op_type == 'Pow':
             flows[-1][0], k = flows[-1][0]
             layers.append([i.name, 'pow', [const[k]]])
@@ -75,7 +77,7 @@ def onnx2planer(path):
             axis, keep = i.attribute[0].ints[0], i.attribute[1].i
             layers.append([i.name, 'reducesum', [axis, keep]])
         elif i.op_type == 'Concat':
-            layers.append([i.name, 'concat', None])
+            layers.append([i.name, 'concat', [i.attribute[0].i]])
         elif i.op_type == 'Pad':
             layers.append([i.name, 'identity', None])
         elif i.op_type == 'Sigmoid':
@@ -87,10 +89,22 @@ def onnx2planer(path):
                 if 'kernel' in attr.name:
                     w = attr.ints[0]
             layers.append([i.name, 'avgpool', [w, s]])
+        elif i.op_type == 'Shape':
+            layers.append([i.name, 'shape', None])
+        elif i.op_type == 'Gather':
+            flows[-1][0], k = flows[-1][0]
+            layers.append([i.name, 'gather', [const[k]]])
+        elif i.op_type == 'Mul':
+            layers.append([i.name, 'mul', None])
+        elif i.op_type == 'Reshape':
+            layers.append([i.name, 'reshape', None])
+        elif i.op_type == 'Transpose':
+            layers.append([i.name, 'transpose', [list(i.attribute[0].ints)]])
+        elif i.op_type == 'LogSoftmax':
+            layers.append([i.name, 'logsoftmax', [i.attribute[0].i]])
         else:
             print('lost layer:', i.name)
             return i
-        
     layers.append(['return', 'return', None])
     flows.append([[i.name for i in graph.output], ['return'], 'plrst'])
     weights = np.hstack([i.ravel() for i in weights])

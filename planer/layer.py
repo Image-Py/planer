@@ -4,8 +4,7 @@ from .util import conv, maxpool, upsample, avgpool, np
 class Layer:
     name = 'layer'
 
-    def __init__(self, name):
-        self.name = name
+    def __init__(self): pass
 
     def forward(self, x): pass
 
@@ -127,14 +126,15 @@ class Softmax(Layer):
 class Maxpool(Layer):
     name = 'maxpool'
 
-    def __init__(self, w=2, stride=2):
+    def __init__(self, w=(2,2), pad=(0,0), stride=(2,2)):
         self.w = w
+        self.pad = pad
         self.stride = stride
 
-    def para(self): return (self.w, self.stride)
+    def para(self): return (self.w, self.pad, self.stride)
 
     def forward(self, x):
-        return maxpool(x, (self.w,) * 2, (self.stride,) * 2)
+        return maxpool(x, self.w, self.pad, self.stride)
 
 
 class Avgpool(Layer):
@@ -174,10 +174,10 @@ class UpSample(Layer):
 class Concatenate(Layer):
     name = 'concat'
 
-    def __init__(self): pass
+    def __init__(self, axis): self.axis=axis
 
     def forward(self, x):
-        return np.concatenate(x, axis=1)
+        return np.concatenate(x, axis=self.axis)
 
 
 class Add(Layer):
@@ -286,11 +286,46 @@ class BatchNorm(Layer):
         self.kmv_inv_b.shape = self.kv_inv.shape = (1,-1,1,1)
         return self.c * 4
 
+class LogSoftmax(Layer):
+    name = 'logsoftmax'
+
+    def __init__(self, axis=-1):
+        self.axis = axis
+        
+    def forward(self, x):
+        maxX = np.max(x, axis=self.axis, keepdims=True)
+        eX = np.exp(x - maxX)
+        y = x - maxX - np.log(np.sum(eX, axis=self.axis, keepdims=True))
+        return y
+
+class Shape(Layer):
+    name = 'shape'
+
+    def forward(self, x): return x.shape
+
+class Gather(Layer):
+    name = 'gather'
+    def __init__(self, idx): self.idx = idx
+
+    def forward(self, x): return x[self.idx]
+
+class Reshape(Layer):
+    name = 'reshape'
+
+    def forward(self, x): return x[0].reshape(x[1])
+
+class Transpose(Layer):
+    name = 'transpose'
+    def __init__(self, axis):
+        self.axis = axis
+
+    def forward(self, x): return x.transpose(self.axis)
 
 layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU, 'leakyrelu': LeakyReLU, 'batchnorm': BatchNorm,
              'flatten': Flatten, 'sigmoid': Sigmoid, 'softmax': Softmax, 'maxpool': Maxpool, 'avgpool': Avgpool, 'const': Const,
              'upsample': UpSample, 'concat': Concatenate, 'add': Add, 'mul': Mul, 'gap': GlobalAveragePool, 'pow':Pow,
-             'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 'return':Return}
+             'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 'shape': Shape, 'gather':Gather, 'reshape':Reshape,
+             'transpose':Transpose, 'logsoftmax':LogSoftmax, 'return':Return}
 
 if __name__ == "__main__":
     pass

@@ -11,6 +11,7 @@ class Net:
         self.body, self.flow, self.life = [], [], {}
         for i in body:
             para = i[2] or []
+            # print(i, key[i[1]], para)
             self.body.append((i[0], key[i[1]](*para)))
         for i in range(len(flow)):
             keys = flow[i][0]

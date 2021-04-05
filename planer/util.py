@@ -7,51 +7,50 @@ def pad(img, shp, mode='constant', constant_values=0):
     if shp[2][0]==shp[2][1]==shp[3][0]==shp[3][1]==0: return img
     (n, c, h, w), (mn, mc, mh, mw) = img.shape, shp
     newimg = np.zeros((n, c, h+mh[0]*2, w+mw[0]*2), dtype=img.dtype)
-    newimg[:,:,mh[0]:-mh[1],mw[0]:-mw[1]] = img
+    newimg[:,:,mh[0]:h+mh[0],mw[0]:w+mw[0]] = img
     return newimg
 
-def conv(img, core, group=1, stride=(1, 1), dilation=(1, 1)):
+def conv(img, core, group=1, mar=(1, 1), stride=(1, 1), dilation=(1, 1)):
     (strh, strw), (dh, dw) = stride, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
     cimg_w = c * h * w * group
     cimg_h, i = (hi//strh)*(wi//strw), 0
-    shp = ((0, 0), (0, 0), (dh*(h//2),)*2, (dw*(w//2),)*2)
+    # shp = ((0, 0), (0, 0), (dh*(h//2),)*2, (dw*(w//2),)*2)
+    shp = ((0, 0), (0, 0), (mar[0],)*2, (mar[1],)*2)
     img = pad(img, shp, 'constant', constant_values=0)
     img = img.transpose((1,0,2,3)) # nchw -> cnhw
-    col_img = np.zeros((ci, w*h,  ni, hi//strh, wi//strw), img.dtype) #(h*w, c, N, H, W)
+    nh = (hi + sum(shp[2]) - h + strh)
+    nw = (wi + sum(shp[3]) - w + strw)
+    col_img = np.zeros((ci, w*h,  ni, nh//strh, nw//strw), img.dtype) #(h*w, c, N, H, W)
     for r in range(0, h*dh, dh):
         for c in range(0, w*dw, dw):
-            col_img[:,i], i = img[:,:,0+r:hi+r:strh, 0+c:wi+c:strw], i+1
+            col_img[:,i], i = img[:,:,0+r:nh+r:strh, 0+c:nw+c:strw], i+1
     col_core = core.reshape((group, core.shape[0]//group, -1))
     col_img.shape = (group, cimg_w//group, -1)
     rst = [i.dot(j) for i, j in zip(col_core, col_img)]
     rst = rst[0] if group==1 else np.concatenate(rst)
-    return rst.reshape((n, ni, hi//strh, wi//strw)).transpose(1, 0, 2, 3)
+    return rst.reshape((n, ni, nh//strh, nw//strw)).transpose(1, 0, 2, 3)
 
-def pool_nxn(img, f, s):
-    n, c, h, w = img.shape
-    rshp = img.reshape(n,c,h//s,s,w//s,s)
-    rshp = rshp.transpose((0,1,2,4,3,5))
-    if f == 'max': return rshp.max(axis=(4,5))
-    if f == 'mean': return rshp.mean(axis=(4,5))
-
-def pool(img, f, core=(2, 2), stride=(2, 2), const=0):
+def pool(img, f, core=(2, 2), mar=None, stride=(2, 2),  const=0):
     (n, c, h, w), (ch, cw), (strh, strw) = img.shape, core, stride
-    shp = ((0, 0), (0, 0), ((ch-1)//2,)*2, ((cw-1)//2,)*2)
+    # shp = ((0, 0), (0, 0), ((ch-1)//2,)*2, ((cw-1)//2,)*2)
+    shp = ((0, 0), (0, 0), (mar[0],)*2, (mar[1],)*2)
     img = pad(img, shp, 'constant', constant_values=0)
     (imn, ic, ih, iw), imgs = img.shape, []
-    buf = np.zeros(img.shape[:2]+(h//strh,w//strw), np.float32)
+    dh = (h + sum(shp[2]) - core[0] + strh)
+    dw = (w + sum(shp[3]) - core[1] + strw)
+    buf = np.zeros(img.shape[:2]+(dh//strh, dw//strw), np.float32)
     if const != 0: buf[:] = const
     for r in range(0, ch, 1):
         for c in range(0, cw, 1):
-            f(img[:,:,r:h+r:strh,c:w+c:strw], buf, out=buf)
+            f(img[:,:,r:dh+r:strh,c:dw+c:strw], buf, out=buf)
     return buf
 
-def maxpool(i, c=(2, 2), s=(2, 2)):
-    return pool(i, np.maximum, c, s, -1e4)
+def maxpool(i, c=(2, 2), mar=(0,0), s=(2, 2)):
+    return pool(i, np.maximum, c, mar, s, -1e4)
 
-def avgpool(i, c=(2, 2), s=(2, 2)):
-    rst = pool(i, np.add, c, s, 0)
+def avgpool(i, c=(2, 2), mar=(0,0), s=(2, 2)):
+    rst = pool(i, np.add, c, mar, s, 0)
     rst /= c[0] * c[1]
     return rst
     
@@ -117,5 +116,24 @@ if __name__ == '__main__':
     core = np.zeros((32, 64, 3, 3), dtype=np.float32)
     conv(img, core)
     '''
-    img = np.arange(4).reshape(1,1,2,2)
-    rst = avgpool(img)
+    
+    #img = np.arange(4).reshape(1,1,2,2)
+    #rst = avgpool(img)
+
+    import torch
+
+    x = torch.arange(16).view(1, 1, 4, 4).float()
+
+    # p = torch.nn.MaxPool2d((2, 2), (2, 1), (0, 1))
+    p = torch.nn.Conv2d(1, 3, 3, stride=1, padding=0)
+
+    k = p.weight.detach().numpy()
+    b = p.bias.detach().numpy()
+    
+    print(x.shape, p(x))
+
+    x = np.arange(16).reshape(1,1,4,4).astype(np.float32)
+
+
+    y = conv(x, k, 1, (0,0), (1,1), (1,1))
+    print(y + b.reshape(1, -1, 1, 1))
