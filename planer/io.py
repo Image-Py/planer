@@ -40,8 +40,8 @@ def onnx2planer(path):
             layers.append([i.name, 'batchnorm', [weights[-1].shape[0]]])
         elif i.op_type == 'Conv':
             attr, w = i.attribute, weights[-2].shape
-            g, d, s = attr[1].i, attr[0].ints[0], attr[4].ints[0]
-            layers.append([i.name, 'conv', [w[1], w[0], w[2], g, s, d]])
+            g, d, p, s = attr[1].i, attr[0].ints[0], attr[3].ints[0], attr[4].ints[0]
+            layers.append([i.name, 'conv', [w[1], w[0], w[2], g, s, d, p]])
         elif i.op_type == 'Gemm':
             layers.append([i.name, 'dense', list(weights[-2].shape[::-1])])
         elif i.op_type == 'MaxPool':

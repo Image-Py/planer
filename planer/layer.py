@@ -43,7 +43,7 @@ class Dense(Layer):
 class Conv2d(Layer):
     name = 'conv'
 
-    def __init__(self, c, n, w, g=1, s=1, d=1):
+    def __init__(self, c, n, w, g=1, s=1, d=1, p=1):
         """
         c: in_channels
         n: out_channels
@@ -51,9 +51,11 @@ class Conv2d(Layer):
         g: groups
         s: stride
         d: dilation
+        p: padding
         """
         self.n, self.c, self.w = n, c, w
         self.g, self.s, self.d = g, s, d
+        self.p = p
 
         self.K = np.zeros((n, c, w, w), dtype=np.float32)
         self.bias = np.zeros(n, dtype=np.float32)
@@ -62,7 +64,7 @@ class Conv2d(Layer):
         return self.n, self.c, self.w, self.s, self.d
 
     def forward(self, x):
-        out = conv(x, self.K, self.g, (self.s, self.s), (self.d, self.d))
+        out = conv(x, self.K, self.g, (self.p, self.p), (self.s, self.s), (self.d, self.d))
         out += self.bias.reshape(1, -1, 1, 1)
         return out
 
