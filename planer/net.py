@@ -41,7 +41,7 @@ class Net:
                 if not obj.name in self.timer:
                     self.timer[obj.name] = 0
                 self.timer[obj.name] += cost
-        return rst[y]
+        return rst[y][0] if len(rst[y])==1 else rst[y]
 
     def layer2code(self, style='list'):
         body = []

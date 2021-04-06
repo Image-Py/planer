@@ -84,10 +84,8 @@ def onnx2planer(path):
             layers.append([i.name, 'sigmoid', None])
         elif i.op_type == 'AveragePool':
             for attr in i.attribute:
-                if 'stride' in attr.name:
-                    s = attr.ints[0]
-                if 'kernel' in attr.name:
-                    w = attr.ints[0]
+                if 'stride' in attr.name: s = attr.ints[0]
+                if 'kernel' in attr.name: w = attr.ints[0]
             layers.append([i.name, 'avgpool', [w, s]])
         elif i.op_type == 'Shape':
             layers.append([i.name, 'shape', None])
