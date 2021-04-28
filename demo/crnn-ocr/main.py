@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../../')
 import planer
 import numpy as np
 from time import time
@@ -14,7 +16,7 @@ def greedy_search(raw, blank=0):
     return max_id[max_id!=blank]
 
 # net = planer.onnx2planer('./crnn.onnx')
-net = planer.read_net('./crnn')
+net = planer.read_net('./crnn-ocr')
 
 x = page()[:40,:150].astype('float32')
 
@@ -23,9 +25,14 @@ x = planer.resize(x, (48, w))
 x = (x - 0.5)/(90/255)
 x = x[None, None, :, :]
 
+net.timer = {}
 start = time()
 y = net(x)
 print(time()-start)
+
+for k in net.timer:
+    print(k, net.timer[k])
+    
 pred = greedy_search(y)
 pred = [dic[i] for i in pred]
 text = ''.join(pred)

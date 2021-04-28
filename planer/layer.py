@@ -295,10 +295,9 @@ class LogSoftmax(Layer):
         self.axis = axis
         
     def forward(self, x):
-        maxX = np.max(x, axis=self.axis, keepdims=True)
-        eX = np.exp(x - maxX)
-        y = x - maxX - np.log(np.sum(eX, axis=self.axis, keepdims=True))
-        return y
+        y = x - np.max(x, axis=self.axis, keepdims=True)
+        eX = np.sum(np.exp(y), axis=self.axis, keepdims=True)
+        y -= np.log(eX); return y
 
 class Shape(Layer):
     name = 'shape'

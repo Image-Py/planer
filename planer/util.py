@@ -19,17 +19,18 @@ def conv(img, core, group=1, mar=(1, 1), stride=(1, 1), dilation=(1, 1)):
     shp = ((0, 0), (0, 0), (mar[0],)*2, (mar[1],)*2)
     img = pad(img, shp, 'constant', constant_values=0)
     img = img.transpose((1,0,2,3)) # nchw -> cnhw
-    nh = (hi + sum(shp[2]) - h + strh)
-    nw = (wi + sum(shp[3]) - w + strw)
-    col_img = np.zeros((ci, w*h,  ni, nh//strh, nw//strw), img.dtype) #(h*w, c, N, H, W)
+    nh = (hi + sum(shp[2]) - h + strh)//strh
+    nw = (wi + sum(shp[3]) - w + strw)//strw
+    nsh, nsw = nh * strh, nw * strw
+    col_img = np.zeros((ci, w*h,  ni, nh, nw), img.dtype) #(h*w, c, N, H, W)
     for r in range(0, h*dh, dh):
         for c in range(0, w*dw, dw):
-            col_img[:,i], i = img[:,:,0+r:nh+r:strh, 0+c:nw+c:strw], i+1
+            col_img[:,i], i = img[:,:,0+r:nsh+r:strh, 0+c:nsw+c:strw], i+1
     col_core = core.reshape((group, core.shape[0]//group, -1))
     col_img.shape = (group, cimg_w//group, -1)
     rst = [i.dot(j) for i, j in zip(col_core, col_img)]
     rst = rst[0] if group==1 else np.concatenate(rst)
-    return rst.reshape((n, ni, nh//strh, nw//strw)).transpose(1, 0, 2, 3)
+    return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
 
 def pool(img, f, core=(2, 2), mar=None, stride=(2, 2),  const=0):
     (n, c, h, w), (ch, cw), (strh, strw) = img.shape, core, stride
@@ -37,13 +38,14 @@ def pool(img, f, core=(2, 2), mar=None, stride=(2, 2),  const=0):
     shp = ((0, 0), (0, 0), (mar[0],)*2, (mar[1],)*2)
     img = pad(img, shp, 'constant', constant_values=0)
     (imn, ic, ih, iw), imgs = img.shape, []
-    dh = (h + sum(shp[2]) - core[0] + strh)
-    dw = (w + sum(shp[3]) - core[1] + strw)
-    buf = np.zeros(img.shape[:2]+(dh//strh, dw//strw), np.float32)
+    dh = (h + sum(shp[2]) - core[0] + strh)//strh
+    dw = (w + sum(shp[3]) - core[1] + strw)//strw
+    nsh, nsw = dh * strh, dw * strw
+    buf = np.zeros(img.shape[:2]+(dh, dw), np.float32)
     if const != 0: buf[:] = const
     for r in range(0, ch, 1):
         for c in range(0, cw, 1):
-            f(img[:,:,r:dh+r:strh,c:dw+c:strw], buf, out=buf)
+            f(img[:,:,r:nsh+r:strh,c:nsw+c:strw], buf, out=buf)
     return buf
 
 def maxpool(i, c=(2, 2), mar=(0,0), s=(2, 2)):
