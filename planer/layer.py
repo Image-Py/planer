@@ -322,10 +322,14 @@ class Transpose(Layer):
 
     def forward(self, x): return x.transpose(self.axis)
 
-layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU, 'leakyrelu': LeakyReLU, 'batchnorm': BatchNorm,
-             'flatten': Flatten, 'sigmoid': Sigmoid, 'softmax': Softmax, 'maxpool': Maxpool, 'avgpool': Avgpool, 'const': Const,
-             'upsample': UpSample, 'concat': Concatenate, 'add': Add, 'mul': Mul, 'gap': GlobalAveragePool, 'pow':Pow,
-             'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 'shape': Shape, 'gather':Gather, 'reshape':Reshape,
+layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU, 
+             'leakyrelu': LeakyReLU, 'batchnorm': BatchNorm,
+             'flatten': Flatten, 'sigmoid': Sigmoid, 'softmax': Softmax, 
+             'maxpool': Maxpool, 'avgpool': Avgpool, 'const': Const,
+             'upsample': UpSample, 'concat': Concatenate, 'add': Add, 
+             'mul': Mul, 'gap': GlobalAveragePool, 'pow':Pow,
+             'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 
+             'shape': Shape, 'gather':Gather, 'reshape':Reshape,
              'transpose':Transpose, 'logsoftmax':LogSoftmax, 'return':Return}
 
 if __name__ == "__main__":
