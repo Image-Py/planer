@@ -7,11 +7,11 @@ class Net:
         self.body, self.flow = [], []
         self.life, self.timer = {}, {}
 
-    def load_json(self, body, flow):
+    def load_json(self, body, flow, debug=False):
         self.body, self.flow, self.life = [], [], {}
         for i in body:
             para = i[2] or []
-            # print(i, key[i[1]], para)
+            if debug: print(i)
             self.body.append((i[0], key[i[1]](*para)))
         for i in range(len(flow)):
             keys = flow[i][0]
@@ -20,7 +20,13 @@ class Net:
             
         self.layer, self.flow = body, flow
 
-    def forward(self, x):
+    def info(self, obj):
+        if isinstance(obj, list):
+            return [self.info(i) for i in obj]
+        if hasattr(obj, 'shape'): return obj.shape
+        return obj
+
+    def forward(self, x, debug=False):
         dic = dict(self.body)
         rst = {self.flow[0][0]: x, 'None': None}
         for i in range(len(self.flow)):
@@ -36,7 +42,10 @@ class Net:
                     if self.life[k]<=i: del rst[k]
                 obj = dic[l]
                 start = time()
+                if debug: print(obj.name, ':', obj.para())
+                if debug: print('--> ', out, ':', self.info(p))
                 rst[y] = obj(p)
+                if debug: print('<-- ',  y, ':', self.info(rst[y]))
                 cost = time()-start
                 if not obj.name in self.timer:
                     self.timer[obj.name] = 0
@@ -95,8 +104,8 @@ class Net:
         from .plot import plot_net
         plot_net(self.layer, self.flow, info).show()
 
-    def __call__(self, x):
-        return self.forward(x)
+    def __call__(self, x, debug=False):
+        return self.forward(x, debug)
 
 
 if __name__ == '__main__':

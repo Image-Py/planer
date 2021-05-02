@@ -61,7 +61,7 @@ class Conv2d(Layer):
         self.bias = np.zeros(n, dtype=np.float32)
 
     def para(self):
-        return self.n, self.c, self.w, self.s, self.d
+        return self.n, self.c, self.w, self.s, self.d, self.p
 
     def forward(self, x):
         out = conv(x, self.K, self.g, (self.p, self.p), (self.s, self.s), (self.d, self.d))
@@ -129,9 +129,7 @@ class Maxpool(Layer):
     name = 'maxpool'
 
     def __init__(self, w=(2,2), pad=(0,0), stride=(2,2)):
-        self.w = w
-        self.pad = pad
-        self.stride = stride
+        self.w, self.pad, self.stride = w, pad, stride
 
     def para(self): return (self.w, self.pad, self.stride)
 
@@ -142,14 +140,13 @@ class Maxpool(Layer):
 class Avgpool(Layer):
     name = 'avgpool'
 
-    def __init__(self, w=2, stride=2):
-        self.w = w
-        self.stride = stride
+    def __init__(self, w=(2,2), pad=(0,0), stride=(2,2)):
+        self.w, self.pad, self.stride = w, pad, stride
 
     def para(self): return (self.w, self.stride)
 
     def forward(self, x):
-        return avgpool(x, (self.w,) * 2, (self.stride,) * 2)
+        return avgpool(x, self.w, self.pad, self.stride)
 
 
 class GlobalAveragePool(Layer):
@@ -229,7 +226,7 @@ class Unsqueeze(Layer):
         self.dim = dim
     
     def forward(self, x):
-        return np.expand_dims(x, self.dim)
+        return np.expand_dims(np.asarray(x), self.dim)
 
 
 class Mul(Layer):
@@ -313,7 +310,8 @@ class Gather(Layer):
 class Reshape(Layer):
     name = 'reshape'
 
-    def forward(self, x): return x[0].reshape(x[1])
+    def forward(self, x): 
+        return x[0].reshape(x[1].tolist())
 
 class Transpose(Layer):
     name = 'transpose'

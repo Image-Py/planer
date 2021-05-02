@@ -5,7 +5,7 @@ from time import time
 import json, zipfile
 from io import BytesIO
 
-def read_net(path):
+def read_net(path, debug=False):
     net = Net()
     if os.path.exists(path+'.pla'):
         with zipfile.ZipFile(path+'.pla') as f:
@@ -14,12 +14,13 @@ def read_net(path):
             lay, flw = body['layers'], body['flow']
             buf = BytesIO(f.read(path+'.npy'))
             weights = np.load(buf)
-    else:
+    elif os.path.exists(path+'.json'):
         with open(path+'.json') as f:
             body = json.load(f)
             lay, flw = body['layers'], body['flow']
         weights = np.load(path+'.npy')
-    net.load_json(lay, flw)
+    else: return print('model %s not found!'%path)
+    net.load_json(lay, flw, debug)
     net.load_weights(weights)
     return net
 
@@ -114,22 +115,6 @@ def onnx2planer(path):
     with zipfile.ZipFile(path.replace('onnx', 'pla'), 'w') as f:
         f.write(path.replace('onnx','json'))
         f.write(path.replace('onnx','npy'))
-    
-    
-
-def torch2planer(net, name, x, in_name=None, out_name=None):
-    import torch
-    import sys
-    np.save(name+'.npy', get_weight(net))
-    stdout = sys.stdout
-    sys.stdout = open(name+'.txt', 'w')
-    torch.onnx.export(net, x, 'useless.onnx', verbose=True,
-        input_names=in_name, output_names=out_name)
-    sys.stdout = stdout
-    body, flow = read_onnx(name)
-    # the json file is needed
-    with open(name+'.json', 'w') as jsfile:
-        json.dump({'layers':body, 'flow':flow}, jsfile)
 
 if __name__ == '__main__':
     a, b = read_onnx('../demo/yolov3-planer-2/yolov3')
