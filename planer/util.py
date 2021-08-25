@@ -55,37 +55,46 @@ def avgpool(i, c=(2, 2), mar=(0,0), s=(2, 2)):
     return rst
 
 def make_upmat(k):
-    xs = np.linspace(0.5/k, 1-0.5/k, k*1, dtype=np.float32)
-    rs, cs = xs[:,None], xs[None,:]
+    ys = np.linspace(0.5/k[0], 1-0.5/k[0], k[0]*1, dtype=np.float32)
+    xs = np.linspace(0.5/k[1], 1-0.5/k[1], k[1]*1, dtype=np.float32)
+    rs, cs = ys[:,None], xs[None,:]
+    if k[0]==1: return np.vstack([1-xs, xs])
+    if k[1]==1: return np.vstack([1-ys, ys])
     klt = ((1-cs)*(1-rs)).reshape((1,-1))
     krt = (cs * (1-rs)).reshape((1,-1))
     klb = ((1-cs) * rs).reshape((1,-1))
     krb = (cs * rs).reshape((1,-1))
     return np.vstack([klt, krt, klb, krb])
     
-def upsample_blinear(img, k, matbuf={}):    
+def upsample_blinear(img, k):    
     n, c, h, w = img.shape
-    img = (img[:,:,:1,:], img, img[:,:,-1:,:])
-    img = np.concatenate(img, axis=2)
-    img = (img[:,:,:,:1], img, img[:,:,:,-1:])
-    img = np.concatenate(img, axis=3)
-    if not k in matbuf: matbuf[k] = make_upmat(k)    
+    if k[0] == k[1] == 1: return img
+    if k[0]>1:
+        img = (img[:,:,:1,:], img, img[:,:,-1:,:])
+        img = np.concatenate(img, axis=2)
+    if k[1]>1:
+        img = (img[:,:,:,:1], img, img[:,:,:,-1:])
+        img = np.concatenate(img, axis=3)
     imgs = [img[:,:,:-1,:-1], img[:,:,:-1,1:],
             img[:,:,1:,:-1], img[:,:,1:,1:]]
+    if k[0]==1: imgs = [img[:,:,:,:-1], img[:,:,:,1:]]
+    if k[1]==1: imgs = [img[:,:,:-1,:], img[:,:,1:,:]]
     imgs = [i[:,:,:,:,None] for i in imgs]
     rst = np.concatenate(imgs, axis=-1)
-    rst = np.dot(rst.reshape((-1,4)), matbuf[k])
-    rst = rst.reshape((-1, w+1, k, k))
+    rst = np.dot(rst.reshape((-1,len(imgs))), make_upmat(k))
+    hh, ww = h + (k[0]>1), w + (k[1]>1)
+    rst = rst.reshape((-1, ww, k[0], k[1]))
     rst = rst.transpose((0,2,1,3))
-    rst = rst.reshape((n,c,(h+1)*k, (w+1)*k))
-    return rst[:,:,k//2:-k//2,k//2:-k//2]
+    rst = rst.reshape((n, c ,hh*k[0], ww*k[1]))
+    return rst[:,:,k[0]//2:hh*k[0]-k[0]//2,k[1]//2:ww*k[1]-k[1]//2]
 
 def upsample_nearest(img, k):
     n, c, h, w = img.shape
-    rst = np.zeros((n, c, h, k, w, k), dtype=np.float32)
-    trst = rst.transpose((0,1,2,4,3,5))
-    trst[:] = img[:,:,:,:,None,None]
-    return rst.reshape((n, c, h*k, w*k))
+    rst = np.zeros((n, c, h*k[0], w*k[1]), dtype=np.float32)
+    for r in range(k[0]):
+        for c in range(k[1]):
+            rst[:,:,r::k[0],c::k[1]]=img
+    return rst
 
 def upsample(img, k, mode):
     if mode=='nearest': return upsample_nearest(img, k)
@@ -216,4 +225,7 @@ if __name__ == '__main__':
     conv(img, core)
     '''
     import numpy as np
-    a = np.arange(12).reshape(2,2,3)
+    a = np.arange(4).reshape(1,1,2,2)
+    print(a)
+    core = np.ones(3).reshape(1,1,1,3)
+    print(conv(a, core, mar=(0,1)))

@@ -1,5 +1,6 @@
 from .util import conv, maxpool, upsample, avgpool, np
 
+def ls(x): return (x, [x,x])[type(x) in {int, float}]
 
 class Layer:
     name = 'layer'
@@ -36,7 +37,6 @@ class Dense(Layer):
         sk, sb = self.K.size, self.bias.size
         self.K.ravel()[:] = buf[:sk]
         self.bias.ravel()[:] = buf[sk:sk+sb]
-
         return sk + sb
 
 
@@ -53,18 +53,18 @@ class Conv2d(Layer):
         d: dilation
         p: padding
         """
-        self.n, self.c, self.w = n, c, w
-        self.g, self.s, self.d = g, s, d
-        self.p = p
+        self.n, self.c, self.w = n, c, ls(w)
+        self.g, self.s, self.d = g, ls(s), ls(d)
+        self.p = ls(p)
 
-        self.K = np.zeros((n, c, w, w), dtype=np.float32)
+        self.K = np.zeros((n, c, *ls(w)), dtype=np.float32)
         self.bias = np.zeros(n, dtype=np.float32)
 
     def para(self):
         return self.n, self.c, self.w, self.s, self.d, self.p
 
     def forward(self, x):
-        out = conv(x, self.K, self.g, (self.p, self.p), (self.s, self.s), (self.d, self.d))
+        out = conv(x, self.K, self.g, self.p, self.s, self.d)
         out += self.bias.reshape(1, -1, 1, 1)
         return out
 
@@ -161,10 +161,10 @@ class UpSample(Layer):
     name = 'upsample'
 
     def __init__(self, k, mode):
-        self.k = k
+        self.k = ls(k)
         self.mode = mode
 
-    def para(self): return (self.k,)
+    def para(self): return (self.k, self.mode)
 
     def forward(self, x):
         return upsample(x, self.k, self.mode)

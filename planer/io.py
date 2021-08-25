@@ -30,7 +30,7 @@ def onnx2planer(path):
     layers, weights, flows, const, values = [], [], [], {}, {}
     for i in graph.initializer: values[i.name] = onnx.numpy_helper.to_array(i)
     for i in graph.node:
-        # print(i.name)
+        # print(i.input, i.name, i.output)
         has = [i for i in i.input if i in values]
         no = [i for i in i.input if not i in values]
         if len(no)==1: no = no[0]
@@ -41,18 +41,24 @@ def onnx2planer(path):
             layers.append([i.name, 'batchnorm', [weights[-1].shape[0]]])
         elif i.op_type == 'Conv':
             attr, w = i.attribute, weights[-2].shape
-            g, d, p, s = attr[1].i, attr[0].ints[0], attr[3].ints[0], attr[4].ints[0]
-            layers.append([i.name, 'conv', [w[1], w[0], w[2], g, s, d, p]])
+            g, d, p, s = attr[1].i, list(attr[0].ints), list(attr[3].ints)[-2:], list(attr[4].ints)
+            layers.append([i.name, 'conv', [w[1], w[0], [w[2], w[3]], g, s, d, p]])
         elif i.op_type == 'Gemm':
             layers.append([i.name, 'dense', list(weights[-2].shape[::-1])])
         elif i.op_type == 'MaxPool':
-            w, m, s = i.attribute[0].ints, i.attribute[1].ints, i.attribute[2].ints
+            ks = ['kernel_shape', 'pads', 'strides']
+            names = [j.name for j in i.attribute]
+            w, m, s = [i.attribute[names.index(j)].ints for j in ks]
             layers.append([i.name, 'maxpool', [list(i) for i in [w, m[2:], s]]])
         elif i.op_type == 'GlobalAveragePool':
             layers.append([i.name, 'gap', None])
         elif i.op_type == 'Upsample':
             mode, k = i.attribute[0].s.decode('utf-8'), weights.pop(-1)
             layers.append([i.name, 'upsample', [int(k[-1]), mode]])
+        elif i.op_type == 'Resize':
+            flows[-1][0] = flows[-1][0][0]
+            mode, k = i.attribute[2].s.decode(), weights.pop(-1)
+            layers.append([i.name, 'upsample', [[int(k[2]), int(k[3])], mode]])
         elif i.op_type == 'Flatten':
             layers.append([i.name, 'flatten', None])
         elif i.op_type == 'Unsqueeze':
@@ -70,6 +76,7 @@ def onnx2planer(path):
             buf = i.attribute[0].t.raw_data
             tp = i.attribute[0].t.data_type
             tp, fmt = [(int, 'int64'), (float, 'float32')][tp==1]
+            if len(buf)==0: continue
             const[i.output[0]] = tp(np.frombuffer(buf, fmt))
         elif i.op_type == 'Pow':
             flows[-1][0], k = flows[-1][0]
