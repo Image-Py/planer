@@ -17,16 +17,19 @@ def conv(img, core, group=1, mar=(1, 1), stride=(1, 1), dilation=(1, 1), mode='c
     cimg_h, i = (hi//strh)*(wi//strw), 0
     shp = ((0, 0), (0, 0), (mar[0],)*2, (mar[1],)*2)
     img = pad(img, shp, mode, constant_values=0)
-    img = img.transpose((1,0,2,3)) # nchw -> cnhw
     nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
     nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw
     nsh, nsw = nh * strh, nw * strw
-    col_img = np.zeros((ci, w*h,  ni, nh, nw), img.dtype) #(h*w, c, N, H, W)
-    for r in range(0, h*dh, dh):
-        for c in range(0, w*dw, dw):
-            col_img[:,i], i = img[:,:,0+r:nsh+r:strh, 0+c:nsw+c:strw], i+1
-    col_core = core.reshape((group, core.shape[0]//group, -1))
-    col_img.shape = (group, cimg_w//group, -1)
+
+    ss = img.strides # n, c, h, w
+    shape = (ci, w, h,  ni, nh, nw)
+    strides  = (ss[-3], ss[-2]*dh, ss[-1]*dw, ss[-4], ss[-2]*strh, ss[-1]*strw)
+    col_img = np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides)
+
+    col_core = core.reshape(group, core.shape[0]//group, -1)
+    col_img = col_img.reshape(group, cimg_w//group, -1)
+
+    if group>1: print(group, col_core.shape, col_img.shape)
     rst = [i.dot(j) for i, j in zip(col_core, col_img)]
     rst = rst[0] if group==1 else np.concatenate(rst)
     return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
@@ -66,7 +69,7 @@ def make_upmat(k):
     krb = (cs * rs).reshape((1,-1))
     return np.vstack([klt, krt, klb, krb])
     
-def upsample_blinear(img, k):    
+def upsample_blinear(img, k):
     n, c, h, w = img.shape
     if k[0] == k[1] == 1: return img
     if k[0]>1:
@@ -168,12 +171,12 @@ def mapcoord(img, rs, cs, keeptp=True):
 # glob：感受野，当缩放后尺寸不足window时，将图像调整为glob整数倍
 # window：瓦片尺寸，当缩放后图像大于window，则进行分块处理
 # margin：瓦片之间的重叠区域，整数代表宽度，小数代表占瓦片的比例
-def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32'):
+def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=print):
     def wrapf(f):
         def wrap(*p, **key):
             (h, w), img = p[0].shape[:2], p[0]
             img = np.asarray(img, dtype=astype)
-            tps = {'sample', 'window', 'glob'}
+            tps = {'sample', 'window', 'glob', 'margin', 'progress'}
             ftp = fp, tp = {}, {}
             for i in key:
                 ftp[i in tps][i] = key[i]
@@ -181,13 +184,13 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32'):
             wsz = wsh = wsw = tp.get('window', window)
             gsz = tp.get('glob', glob)
             mar = tp.get('margin', margin)
-            info = tp.get('progress', print)
+            info = tp.get('progress', progress)
             if isinstance(ssz, tuple): ssz = list(ssz)
             else: ssz = [int(h*ssz), int(w*ssz)]
             # 如果尺寸不足瓦片尺寸，则连同瓦片缩放到glob整数倍
-            if wsh>ssz[0]: wsh = ssz[0] = ssz[0]//gsz*gsz
-            if wsw>ssz[1]: wsw = ssz[1] = ssz[1]//gsz*gsz
-            if ssz!=[h, w]: img = resize(img, ssz)
+            if wsh>ssz[0]: wsh = ssz[0] = max(1, ssz[0]//gsz)*gsz
+            if wsw>ssz[1]: wsw = ssz[1] = max(1, ssz[1]//gsz)*gsz
+            if ssz!=[h, w]:img = resize(img, ssz)
             if isinstance(mar, float): mar = int(wsz*mar)
             rcs = grid_slice(*ssz, wsh, wsw, mar)
             if len(rcs)>1: info(1, len(rcs))
