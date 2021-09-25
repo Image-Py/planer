@@ -108,6 +108,13 @@ def onnx2planer(path):
             layers.append([i.name, 'transpose', [list(i.attribute[0].ints)]])
         elif i.op_type == 'LogSoftmax':
             layers.append([i.name, 'logsoftmax', [i.attribute[0].i]])
+        elif i.op_type == 'ConstantOfShape': 
+            v = np.frombuffer(i.attribute[0].t.raw_data, 'float32')
+            layers.append([i.name, 'constantofshape', float(v)])
+        elif i.op_type == 'Split': 
+            layers.append([i.name, 'split', [list(i.attribute[1].ints), i.attribute[0].i]])
+        elif i.op_type == 'Tanh': 
+            layers.append([i.name, 'tanh', None])
         else:
             print('lost layer:', i.name)
             return i

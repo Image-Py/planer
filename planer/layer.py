@@ -81,7 +81,7 @@ class ReLU(Layer):
     def __init__(self): pass
 
     def forward(self, x):
-        msk = x>0; x *= msk; return x
+        return np.multiply(x, x>0, out=x)
 
 class LeakyReLU(Layer):
     name = 'leakyrelu'
@@ -319,6 +319,28 @@ class Transpose(Layer):
 
     def forward(self, x): return x.transpose(self.axis)
 
+class ConstantofShape(Layer):
+    name = 'constantofshape'
+    def __init__(self, v=0):
+        self.v = v
+
+    def forward(self, x):
+        return np.full(x.astype('int64').ravel(), self.v, dtype=np.float32)
+
+class Split(Layer):
+    name = 'split'
+    def __init__(self, indices, axis):
+        self.indices, self.axis = indices, axis
+
+    def forward(self, x):
+        return np.split(x, self.indices, self.axis)
+
+class Tanh(Layer):
+    name = 'tanh'
+
+    def forward(self, x):
+        return np.tanh(x)
+
 layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU, 
              'leakyrelu': LeakyReLU, 'batchnorm': BatchNorm,
              'flatten': Flatten, 'sigmoid': Sigmoid, 'softmax': Softmax, 
@@ -327,6 +349,7 @@ layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU,
              'mul': Mul, 'gap': GlobalAveragePool, 'pow':Pow,
              'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 
              'shape': Shape, 'gather':Gather, 'reshape':Reshape,
+             'split':Split, 'tanh':Tanh, 'constantofshape':ConstantofShape,
              'transpose':Transpose, 'logsoftmax':LogSoftmax, 'return':Return}
 
 if __name__ == "__main__":
