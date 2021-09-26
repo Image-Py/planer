@@ -314,9 +314,11 @@ class Shape(Layer):
 
 class Gather(Layer):
     name = 'gather'
-    def __init__(self, idx): self.idx = idx
+    def __init__(self, idx, axis=0): 
+        self.idx, self.axis = idx, axis
 
-    def forward(self, x): return x[self.idx]
+    def forward(self, x): 
+        return np.take(x, self.idx, axis=self.axis)
 
 class Reshape(Layer):
     name = 'reshape'
@@ -345,7 +347,8 @@ class Split(Layer):
         self.indices, self.axis = indices, axis
 
     def forward(self, x):
-        return np.split(x, self.indices, self.axis)
+        seg = np.cumsum(self.indices)
+        return np.split(x[:seg[-1]], seg[:-1], self.axis)
 
 class Tanh(Layer):
     name = 'tanh'

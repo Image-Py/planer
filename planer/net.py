@@ -44,8 +44,12 @@ class Net:
                 start = time()
                 if debug: print(obj.name, ':', obj.para())
                 if debug: print('--> ', out, ':', self.info(p))
-                rst[y] = obj(p)
-                if debug: print('<-- ',  y, ':', self.info(rst[y]))
+                if isinstance(y, str): rst[y] = obj(p)
+                else:
+                    for k, v in zip(y, obj(p)): rst[k] = v
+                if debug: 
+                    for k in (y, [y])[isinstance(y, str)]:
+                        print('<-- ',  k, ':', self.info(rst[k]))
                 cost = time()-start
                 if not obj.name in self.timer:
                     self.timer[obj.name] = 0

@@ -32,26 +32,27 @@ def onnx2planer(path):
     for i in graph.node:
         initpara = [j for j in i.input if j in values]
         subpara = [j for j in i.input if not j in values]
+        outpara = [j for j in i.output]
+
         initset = {'BatchNormalization', 'Conv', 'Gemm', 'Resize', 'Upsample'}
 
         if not i.op_type in initset: subpara = [j for j in i.input]
         # print(i.input, i.name, i.output, has, no)
 
         if len(subpara)==1: subpara = subpara[0]
-
-        
+        if len(outpara)==1: outpara = outpara[0]
 
         # no para layer has init input: constarray
         if len(initpara)>0 and not i.op_type in initset:
             for j in initpara:
                 layers.append(['ConstArray_%s'%j, 'constarray', [values[j].shape]])
                 flows.append([['None'], 'ConstArray_%s'%j, j])
-                print(flows[-1])
 
         if len(subpara)>0: # has no-init para
-            flows.append([subpara, [i.name], i.output[0]])
+            flows.append([subpara, [i.name], outpara])
             weights.extend([values[i] for i in initpara])
 
+            
         if i.op_type == 'BatchNormalization':
             layers.append([i.name, 'batchnorm', [weights[-1].shape[0]]])
         elif i.op_type == 'Conv':
@@ -88,11 +89,12 @@ def onnx2planer(path):
         elif i.op_type == 'Div':
             layers.append([i.name, 'div', None])
         elif i.op_type == 'Constant':
+            dim = i.attribute[0].t.dims
             buf = i.attribute[0].t.raw_data
             tp = i.attribute[0].t.data_type
             tp, fmt = [(int, 'int64'), (float, 'float32')][tp==1]
             if len(buf)==0: continue
-            const[i.output[0]] = tp(np.frombuffer(buf, fmt))
+            const[i.output[0]] = np.frombuffer(buf, fmt).reshape(dim).tolist()
         elif i.op_type == 'Pow':
             flows[-1][0], k = flows[-1][0]
             layers.append([i.name, 'pow', [const[k]]])
@@ -114,7 +116,7 @@ def onnx2planer(path):
             layers.append([i.name, 'shape', None])
         elif i.op_type == 'Gather':
             flows[-1][0], k = flows[-1][0]
-            layers.append([i.name, 'gather', [const[k]]])
+            layers.append([i.name, 'gather', [const[k], i.attribute[0].i]])
         elif i.op_type == 'Mul':
             layers.append([i.name, 'mul', None])
         elif i.op_type == 'Reshape':
