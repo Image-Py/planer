@@ -246,6 +246,18 @@ class Const(Layer):
     def forward(self, x): return self.v
 
 
+class ConstArray(Layer):
+    name = 'constarray'
+    def __init__(self, shp):
+        self.arr = np.zeros(shp, dtype=np.float32)
+
+    def forward(self, x): return self.arr
+
+    def load(self, buf): 
+        self.arr.ravel()[:] = buf[:self.arr.size]
+        return self.arr.size
+
+
 class Return(Layer):
     name = 'return'
 
@@ -350,6 +362,7 @@ layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU,
              'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 
              'shape': Shape, 'gather':Gather, 'reshape':Reshape,
              'split':Split, 'tanh':Tanh, 'constantofshape':ConstantofShape,
+             'constarray':ConstArray,
              'transpose':Transpose, 'logsoftmax':LogSoftmax, 'return':Return}
 
 if __name__ == "__main__":

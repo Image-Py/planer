@@ -30,13 +30,28 @@ def onnx2planer(path):
     layers, weights, flows, const, values = [], [], [], {}, {}
     for i in graph.initializer: values[i.name] = onnx.numpy_helper.to_array(i)
     for i in graph.node:
-        # print(i.input, i.name, i.output)
-        has = [i for i in i.input if i in values]
-        no = [i for i in i.input if not i in values]
-        if len(no)==1: no = no[0]
-        if no != []:
-            flows.append([no, [i.name], i.output[0]])
-            weights.extend([values[i] for i in has])
+        initpara = [j for j in i.input if j in values]
+        subpara = [j for j in i.input if not j in values]
+        initset = {'BatchNormalization', 'Conv', 'Gemm', 'Resize', 'Upsample'}
+
+        if not i.op_type in initset: subpara = [j for j in i.input]
+        # print(i.input, i.name, i.output, has, no)
+
+        if len(subpara)==1: subpara = subpara[0]
+
+        
+
+        # no para layer has init input: constarray
+        if len(initpara)>0 and not i.op_type in initset:
+            for j in initpara:
+                layers.append(['ConstArray_%s'%j, 'constarray', [values[j].shape]])
+                flows.append([['None'], 'ConstArray_%s'%j, j])
+                print(flows[-1])
+
+        if len(subpara)>0: # has no-init para
+            flows.append([subpara, [i.name], i.output[0]])
+            weights.extend([values[i] for i in initpara])
+
         if i.op_type == 'BatchNormalization':
             layers.append([i.name, 'batchnorm', [weights[-1].shape[0]]])
         elif i.op_type == 'Conv':
