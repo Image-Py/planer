@@ -15,35 +15,28 @@ class Layer:
 
     def load(self, buf): return 0
 
-    def __call__(self, x):
-        return self.forward(x)
+    def __call__(self, *x):
+        return self.forward(*x)
 
 
 class Dense(Layer):
     name = 'dense'
 
-    def __init__(self, c, n):
-        self.K = np.zeros((n, c), dtype=np.float32)
-        self.bias = np.zeros(n, dtype=np.float32)
+    def __init__(self, c, n): pass
+        #self.K = np.zeros((n, c), dtype=np.float32)
+        #self.bias = np.zeros(n, dtype=np.float32)
 
-    def para(self): return self.K.shape
+    # def para(self): return self.K.shape
 
-    def forward(self, x):
-        y = x.dot(self.K.T)
-        y += self.bias.reshape((1, -1))
+    def forward(self, x, K, B):
+        y = x.dot(K.T)
+        y += B.reshape((1, -1))
         return y
-
-    def load(self, buf):
-        sk, sb = self.K.size, self.bias.size
-        self.K.ravel()[:] = buf[:sk]
-        self.bias.ravel()[:] = buf[sk:sk+sb]
-        return sk + sb
-
 
 class Conv2d(Layer):
     name = 'conv'
 
-    def __init__(self, c, n, w, g=1, s=1, d=1, p=1):
+    def __init__(self, c, n, w, g=(1,1), s=(1,1), d=(1,1), p=(1,1)):
         """
         c: in_channels
         n: out_channels
@@ -57,22 +50,16 @@ class Conv2d(Layer):
         self.g, self.s, self.d = g, ls(s), ls(d)
         self.p = ls(p)
 
-        self.K = np.zeros((n, c, *ls(w)), dtype=np.float32)
-        self.bias = np.zeros(n, dtype=np.float32)
+        #self.K = np.zeros((n, c, *ls(w)), dtype=np.float32)
+        #self.bias = np.zeros(n, dtype=np.float32)
 
     def para(self):
         return self.n, self.c, self.w, self.s, self.d, self.p
 
-    def forward(self, x):
-        out = conv(x, self.K, self.g, self.p, self.s, self.d)
-        out += self.bias.reshape(1, -1, 1, 1)
+    def forward(self, x, K, B):
+        out = conv(x, K, self.g, self.p, self.s, self.d)
+        out += B.reshape(1, -1, 1, 1)
         return out
-
-    def load(self, buf):
-        sk, sb = self.K.size, self.bias.size
-        self.K.ravel()[:] = buf[:sk]
-        self.bias.ravel()[:] = buf[sk:sk+sb]        
-        return sk + sb
 
 
 class ReLU(Layer):
@@ -110,7 +97,8 @@ class Sigmoid(Layer):
     def __init__(self): pass
 
     def forward(self, x):
-        return 1/(1 + np.exp(-x))
+        x *= -1; np.exp(x, out=x); x += 1
+        return np.divide(1, x, out=x)
 
 
 class Softmax(Layer):
@@ -159,14 +147,14 @@ class GlobalAveragePool(Layer):
 class UpSample(Layer):
     name = 'upsample'
 
-    def __init__(self, k, mode):
-        self.k = ls(k)
+    def __init__(self, mode):
         self.mode = mode
 
-    def para(self): return (self.k, self.mode)
+    def para(self): return self.mode
 
-    def forward(self, x):
-        return upsample(x, self.k, self.mode)
+    def forward(self, x, k):
+        k = k[-2:].astype(np.uint32).tolist()
+        return upsample(x, k, self.mode)
 
 
 class Concatenate(Layer):
@@ -174,8 +162,8 @@ class Concatenate(Layer):
 
     def __init__(self, axis): self.axis=axis
 
-    def forward(self, x):
-        return np.concatenate(x, axis=self.axis)
+    def forward(self, *xs):
+        return np.concatenate(xs, axis=self.axis)
 
 
 class Add(Layer):
@@ -183,18 +171,15 @@ class Add(Layer):
 
     def __init__(self): pass
 
-    def forward(self, x):
-        x[0] += x[1]
-        return x[0]
+    def forward(self, x1, x2):
+        return x1 + x2
 
 
 class Pow(Layer):
     name = 'pow'
     
-    def __init__(self, n): self.n = n
-    
-    def forward(self, x):
-        return np.power(x, self.n)
+    def forward(self, x, p):
+        return np.power(x, p)
 
     
 class Div(Layer):
@@ -202,8 +187,8 @@ class Div(Layer):
     
     def __init__(self): pass
     
-    def forward(self, x):
-        return x[0]/x[1]
+    def forward(self, x1, x2):
+        return x1 / x2
 
 class ReduceSum(Layer):
     name = 'reducesum'
@@ -225,7 +210,7 @@ class Unsqueeze(Layer):
         self.dim = dim
     
     def forward(self, x):
-        return np.expand_dims(np.asarray(x), self.dim)
+        return np.expand_dims(x, self.dim)
 
 
 class Mul(Layer):
@@ -233,23 +218,26 @@ class Mul(Layer):
 
     def __init__(self): pass
 
-    def forward(self, x):
-        x[1] *= x[0]
-        return x[1]
+    def forward(self, x1, x2):
+        return x1 * x2
 
 
 class Const(Layer):
     name = 'const'
 
-    def __init__(self, v): self.v = v
+    def __init__(self, v, tp): 
+        if isinstance(v, list):
+            v = np.array(v, dtype=tp)
+        self.v = v
 
-    def forward(self, x): return self.v
+    def forward(self): 
+        return self.v
 
 
 class ConstArray(Layer):
     name = 'constarray'
     def __init__(self, shp):
-        self.arr = np.zeros(shp, dtype=np.float32)
+        self.arr = np.zeros(shp, dtype=np.int64)
 
     def forward(self, x): return self.arr
 
@@ -261,40 +249,31 @@ class ConstArray(Layer):
 class Return(Layer):
     name = 'return'
 
-    def __init__(self): pass
-
-    def forward(self, x):
+    def forward(self, *x):
         return x
     
 
 class BatchNorm(Layer):
     name = 'batchnorm'
 
-    def __init__(self, c):
-        self.c = c
-        self.k = np.zeros(c, dtype=np.float32)
-        self.b = np.zeros(c, dtype=np.float32)
-        self.m = np.zeros(c, dtype=np.float32)
-        self.v = np.zeros(c, dtype=np.float32)
+    def __init__(self):
+        self.K = self.B = None
 
-    def forward(self, x):
-        x = x * self.kv_inv
-        x += self.kmv_inv_b
+    def forward(self, x, k, b, m, v):
+        K, B = self.eval(k, b, m, v)
+        x = x * K
+        x += B
         return x
         #return self.kv_inv*x + self.kmv_inv_b
 
-    def load(self, buf):
-        c = self.c
-        self.k[:] = buf[0*c:1*c]
-        self.b[:] = buf[1*c:2*c]
-        self.m[:] = buf[2*c:3*c]
-        self.v[:] = buf[3*c:4*c]
-
-        self.v_inv = 1/np.sqrt(self.v + 1e-5)
-        self.kmv_inv_b = -self.k*self.m*self.v_inv + self.b
-        self.kv_inv = self.k*self.v_inv
-        self.kmv_inv_b.shape = self.kv_inv.shape = (1,-1,1,1)
-        return self.c * 4
+    def eval(self, k, b, m, v):
+        if not self.K is None: return self.K, self.B
+        v_inv = 1/np.sqrt(v + 1e-5)
+        kmv_inv_b = -k*m*v_inv + b
+        kv_inv = k*v_inv
+        kmv_inv_b.shape = kv_inv.shape = (1,-1,1,1)
+        self.K, self.B = kv_inv, kmv_inv_b
+        return kv_inv, kmv_inv_b
 
 class LogSoftmax(Layer):
     name = 'logsoftmax'
@@ -310,21 +289,21 @@ class LogSoftmax(Layer):
 class Shape(Layer):
     name = 'shape'
 
-    def forward(self, x): return x.shape
+    def forward(self, x): return np.array(x.shape, dtype=np.int64)
 
 class Gather(Layer):
     name = 'gather'
-    def __init__(self, idx, axis=0): 
-        self.idx, self.axis = idx, axis
+    def __init__(self, axis=0): 
+        self.axis = axis
 
-    def forward(self, x): 
-        return np.take(x, self.idx, axis=self.axis)
+    def forward(self, x, idx): 
+        return np.take(x, idx, axis=self.axis)
 
 class Reshape(Layer):
     name = 'reshape'
 
-    def forward(self, x): 
-        return x[0].reshape(x[1].tolist())
+    def forward(self, x, shp): 
+        return x.reshape(shp.tolist())
 
 class Transpose(Layer):
     name = 'transpose'
@@ -335,26 +314,83 @@ class Transpose(Layer):
 
 class ConstantofShape(Layer):
     name = 'constantofshape'
-    def __init__(self, v=0):
-        self.v = v
+    def __init__(self, v=0, tp='float32'):
+        self.v, self.tp = v, tp
 
     def forward(self, x):
-        return np.full(x.astype('int64').ravel(), self.v, dtype=np.float32)
+        return np.full(x.ravel().tolist(), self.v, dtype=self.tp)
 
 class Split(Layer):
     name = 'split'
     def __init__(self, indices, axis):
         self.indices, self.axis = indices, axis
+        self.seg = np.cumsum(np.array(self.indices)).tolist()
 
     def forward(self, x):
-        seg = np.cumsum(self.indices)
-        return np.split(x[:seg[-1]], seg[:-1], self.axis)
+        return np.split(x[:self.seg[-1]], self.seg[:-1], self.axis)
 
 class Tanh(Layer):
     name = 'tanh'
 
     def forward(self, x):
         return np.tanh(x)
+
+class Slice(Layer):
+    name = 'slice'
+    def __init__(self): self.seas = None
+
+    def forward(self, x, start, end, axis, step=None):
+        if self.seas is None:
+            if step is None: step = np.array([1]*len(start))
+            seas = [start, end, axis, step]
+            start, end, axis, step = [i.tolist() for i in seas]
+            self.seas = start, end, axis, step
+        slis = [slice(None,None,None)] * x.ndim
+        for s, e, a, st in zip(*self.seas):
+            slis[a] = slice(s, e, st)
+        return x[tuple(slis)]
+
+class Expand(Layer):
+    name = 'expand'
+
+    def forward(self, x, shp):
+        ones = np.ones(shp.tolist(), dtype=x.dtype)
+        return ones * x
+
+class Cast(Layer):
+    name = 'cast'
+    def __init__(self, fmt): self.fmt = fmt
+
+    def forward(self, x):
+        return x.astype(self.fmt)
+
+class Range(Layer):
+    name = 'range'
+
+    def forward(self, start, end, delta):
+        return np.arange(start, end, delta)
+
+class Equal(Layer):
+    name = 'equal'
+
+    def forward(self, x1, x2):
+        return np.equal(x1, x2)
+
+class Where(Layer):
+    name = 'where'
+
+    def forward(self, msk, x1, x2):
+        return np.where(msk, x1, x2)
+
+class Scatternd(Layer):
+    name = 'scatternd'
+
+    def forward(self, data, indices, updates):
+        for i in range(len(indices[0])):
+            data = data.copy()
+            data[tuple(indices[0,i])] = updates[0,i]
+        return data
+        
 
 layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU, 
              'leakyrelu': LeakyReLU, 'batchnorm': BatchNorm,
@@ -365,7 +401,9 @@ layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU,
              'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 
              'shape': Shape, 'gather':Gather, 'reshape':Reshape,
              'split':Split, 'tanh':Tanh, 'constantofshape':ConstantofShape,
-             'constarray':ConstArray,
+             'constarray':ConstArray, 'slice':Slice, 'expand':Expand,
+             'cast':Cast, 'range':Range, 'equal':Equal, 'where':Where,
+             'scatternd':Scatternd,
              'transpose':Transpose, 'logsoftmax':LogSoftmax, 'return':Return}
 
 if __name__ == "__main__":
