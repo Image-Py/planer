@@ -30,15 +30,16 @@ types = [None, 'float32', 'uint8', 'int8', 'uint16', 'int16', 'int32', 'int64',
     'str', 'bool', 'float16', 'float64', 'uint32', 'uint64', 'complex64', 'complex128']
 
 def onnx2planer(path):
+    import numpy as np
     import onnx, onnx.numpy_helper
     graph = onnx.load(path).graph
     input_para = [i.name for i in graph.input]
     layers, inits, weights, flows, values = [], [], [], [], {}
     for i in graph.initializer: 
         v = onnx.numpy_helper.to_array(i)
-        values[i.name] = v
+        values[i.name] = len(weights), v.shape
         inits.append([i.name, v.shape, str(v.dtype)])
-        weights.append(v.view(dtype=np.uint8))
+        weights.append(v)
     for i in graph.node:
         inpara = [j for j in i.input]
         # subpara = [j for j in i.input if not j in values]
@@ -66,11 +67,11 @@ def onnx2planer(path):
         if i.op_type == 'BatchNormalization':
             layers.append([i.name, 'batchnorm', None])
         elif i.op_type == 'Conv':
-            attr, w = i.attribute, values[i.input[1]].shape
+            attr, w = i.attribute, values[i.input[1]][1]
             g, d, p, s = attr[1].i, list(attr[0].ints), list(attr[3].ints)[-2:], list(attr[4].ints)
             layers.append([i.name, 'conv', [w[1], w[0], [w[2], w[3]], g, s, d, p]])
         elif i.op_type == 'Gemm':
-            layers.append([i.name, 'dense', list(values[i.input[1]].shape[::-1])])
+            layers.append([i.name, 'dense', list(values[i.input[1]][1][::-1])])
         elif i.op_type == 'MaxPool':
             ks = ['kernel_shape', 'pads', 'strides']
             names = [j.name for j in i.attribute]
@@ -79,10 +80,12 @@ def onnx2planer(path):
         elif i.op_type == 'GlobalAveragePool':
             layers.append([i.name, 'gap', None])
         elif i.op_type == 'Upsample':
+            idx = values[i.input[1]][0]
+            inits[idx][2] = 'int64'
+            weights[idx] = weights[idx].astype(np.int64)
             mode = i.attribute[0].s.decode('utf-8')
             layers.append([i.name, 'upsample', [mode]])
         elif i.op_type == 'Resize':
-            return i
             flows[-1][0] = flows[-1][0][0]
             mode = i.attribute[2].s.decode()
             layers.append([i.name, 'upsample', [mode]])
@@ -165,7 +168,7 @@ def onnx2planer(path):
             return i
     layers.append(['return', 'return', None])
     flows.append([[i.name for i in graph.output], ['return'], 'plrst'])
-    weights = np.hstack([i.ravel() for i in weights])
+    weights = np.hstack([i.view(dtype=np.uint8).ravel() for i in weights])
 
     np.save(path.replace('onnx', 'npy'), weights)
     with open(path.replace('onnx', 'json'), 'w') as f:

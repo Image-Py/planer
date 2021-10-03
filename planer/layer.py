@@ -1,6 +1,9 @@
 from .util import conv, maxpool, upsample, avgpool, np
+import numpy as cpu
 
 def ls(x): return (x, [x,x])[type(x) in {int, float}]
+
+def select(x): return (cpu, np)[isinstance(x, np.ndarray)]
 
 class Layer:
     name = 'layer'
@@ -153,8 +156,7 @@ class UpSample(Layer):
     def para(self): return self.mode
 
     def forward(self, x, k):
-        k = k[-2:].astype(np.uint32).tolist()
-        return upsample(x, k, self.mode)
+        return upsample(x, k[-2:], self.mode)
 
 
 class Concatenate(Layer):
@@ -163,7 +165,7 @@ class Concatenate(Layer):
     def __init__(self, axis): self.axis=axis
 
     def forward(self, *xs):
-        return np.concatenate(xs, axis=self.axis)
+        return select(xs[0]).concatenate(xs, axis=self.axis)
 
 
 class Add(Layer):
@@ -210,7 +212,7 @@ class Unsqueeze(Layer):
         self.dim = dim
     
     def forward(self, x):
-        return np.expand_dims(x, self.dim)
+        return select(x).expand_dims(x, self.dim)
 
 
 class Mul(Layer):
@@ -226,8 +228,6 @@ class Const(Layer):
     name = 'const'
 
     def __init__(self, v, tp): 
-        if isinstance(v, list):
-            v = np.array(v, dtype=tp)
         self.v = v
 
     def forward(self): 
@@ -289,7 +289,7 @@ class LogSoftmax(Layer):
 class Shape(Layer):
     name = 'shape'
 
-    def forward(self, x): return np.array(x.shape, dtype=np.int64)
+    def forward(self, x): return cpu.array(x.shape, dtype=np.int64)
 
 class Gather(Layer):
     name = 'gather'
@@ -297,13 +297,13 @@ class Gather(Layer):
         self.axis = axis
 
     def forward(self, x, idx): 
-        return np.take(x, idx, axis=self.axis)
+        return select(x).take(x, idx, axis=self.axis)
 
 class Reshape(Layer):
     name = 'reshape'
 
     def forward(self, x, shp): 
-        return x.reshape(shp.tolist())
+        return x.reshape(shp)
 
 class Transpose(Layer):
     name = 'transpose'
@@ -318,16 +318,17 @@ class ConstantofShape(Layer):
         self.v, self.tp = v, tp
 
     def forward(self, x):
-        return np.full(x.ravel().tolist(), self.v, dtype=self.tp)
+        u = (np, cpu)['int' in self.tp]
+        return u.full(x.ravel(), self.v, dtype=self.tp)
 
 class Split(Layer):
     name = 'split'
     def __init__(self, indices, axis):
         self.indices, self.axis = indices, axis
-        self.seg = np.cumsum(np.array(self.indices)).tolist()
+        self.seg = cpu.cumsum(self.indices)
 
     def forward(self, x):
-        return np.split(x[:self.seg[-1]], self.seg[:-1], self.axis)
+        return select(x).split(x[:self.seg[-1]], self.seg[:-1], self.axis)
 
 class Tanh(Layer):
     name = 'tanh'
@@ -337,16 +338,13 @@ class Tanh(Layer):
 
 class Slice(Layer):
     name = 'slice'
-    def __init__(self): self.seas = None
 
     def forward(self, x, start, end, axis, step=None):
-        if self.seas is None:
-            if step is None: step = np.array([1]*len(start))
-            seas = [start, end, axis, step]
-            start, end, axis, step = [i.tolist() for i in seas]
-            self.seas = start, end, axis, step
+        if step is None: step = cpu.array([1]*len(start))
+        seas = [start, end, axis, step]
+        start, end, axis, step = [i for i in seas]
         slis = [slice(None,None,None)] * x.ndim
-        for s, e, a, st in zip(*self.seas):
+        for s, e, a, st in zip(start, end, axis, step):
             slis[a] = slice(s, e, st)
         return x[tuple(slis)]
 
@@ -354,7 +352,7 @@ class Expand(Layer):
     name = 'expand'
 
     def forward(self, x, shp):
-        ones = np.ones(shp.tolist(), dtype=x.dtype)
+        ones = np.ones(shp, dtype=x.dtype)
         return ones * x
 
 class Cast(Layer):
@@ -374,13 +372,13 @@ class Equal(Layer):
     name = 'equal'
 
     def forward(self, x1, x2):
-        return np.equal(x1, x2)
+        return select(x1).equal(x1, x2)
 
 class Where(Layer):
     name = 'where'
 
     def forward(self, msk, x1, x2):
-        return np.where(msk, x1, x2)
+        return select(msk).where(msk, x1, x2)
 
 class Scatternd(Layer):
     name = 'scatternd'

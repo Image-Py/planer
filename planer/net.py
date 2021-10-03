@@ -51,7 +51,7 @@ class Net:
                 start = time()
                 if debug: 
                     print(l, obj.name, ':', obj.para())
-                    outp = [(i, 'Weights')[i in self.inits] for i in out]
+                    outp = out #[(i, 'Weights')[i in self.inits] for i in out]
                     print('\t--> ', outp, ':', self.info(p))
                 if isinstance(y, str): rst[y] = obj(*p)
                 else:
@@ -108,12 +108,17 @@ class Net:
         return '\n'.join(body)
 
     def load_weights(self, data):
+        import numpy as cpu
         s, data = 0, data.view(dtype=np.uint8)
-        for i in self.weights:
-            buf = i.view(dtype=np.uint8)
+        for i in range(len(self.weights)):
+            buf = self.weights[i].view(dtype=np.uint8)
             buf.ravel()[:] = data[s:s+buf.size]
             s += buf.size
-
+            if 'int' in str(self.weights[i].dtype):
+                value = self.weights[i]
+                value = cpu.array(value.tolist(), value.dtype)
+                self.weights[i] = value
+                
     def show(self, info=True):
         from .plot import plot_net
         plot_net(self.layer, self.flow, info).show()
