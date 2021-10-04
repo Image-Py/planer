@@ -1,394 +1,131 @@
 from .util import conv, maxpool, upsample, avgpool, np
 import numpy as cpu
 
-def ls(x): return (x, [x,x])[type(x) in {int, float}]
-
 def select(x): return (cpu, np)[isinstance(x, np.ndarray)]
 
-class Layer:
-    name = 'layer'
+def wrap(f, layername='layer'):
+    class Layer:
+        name = layername
+        def __init__(self, **key): self.key = key
+        def para(self): return self.key
+        def forward(self, *x): return f(*x, **self.key)
+        def __call__(self, *x): return self.forward(*x)
+    return Layer
 
-    def __init__(self): pass
+def Dense(x, K, B, shp=None):
+    y = x.dot(K.T)
+    y += B.reshape((1, -1))
+    return y
 
-    def forward(self, x): pass
+def Conv2d(x, K, B, shp=None, group=(1,1), strides=(1,1), dilation=(1,1), pads=(1,1)):
+    out = conv(x, K, group, pads, strides, dilation)
+    out += B.reshape(1, -1, 1, 1)
+    return out
 
-    def backward(self, grad_y): pass
+def ReLU(x): return np.multiply(x, x>0, out=x)
 
-    def para(self): return None
+def LeakyReLU(x, alpha=0.2):
+    xalpha = x * alpha
+    x2 = np.array([x, xalpha])
+    x2 = x2.reshape((2,-1)).max(axis=0)
+    return x2.reshape(x.shape)
 
-    def load(self, buf): return 0
+def Flatten(x): return x.reshape((x.shape[0], -1))
 
-    def __call__(self, *x):
-        return self.forward(*x)
+def Sigmoid(x):
+    x *= -1; np.exp(x, out=x); x += 1
+    return np.divide(1, x, out=x)
 
+def Softmax(x, axis=-1):
+    eX = np.exp((x.T - np.max(x, axis=self.axis)).T)
+    return (eX.T / eX.sum(axis=self.axis)).T
 
-class Dense(Layer):
-    name = 'dense'
+def Maxpool(x, w=(2,2), pads=(0,0), strides=(2,2)):
+    return maxpool(x, w, pads, strides)
 
-    def __init__(self, c, n): pass
-        #self.K = np.zeros((n, c), dtype=np.float32)
-        #self.bias = np.zeros(n, dtype=np.float32)
+def Avgpool(x, w=(2,2), pads=(0,0), strides=(2,2)):
+    return avgpool(x, w, pads, strides)
 
-    # def para(self): return self.K.shape
+def GlobalAveragePool(x):
+    return x.mean(axis=(-2, -1), keepdims=True)
 
-    def forward(self, x, K, B):
-        y = x.dot(K.T)
-        y += B.reshape((1, -1))
-        return y
+def UpSample(x, k, mode='nearest'):
+    return upsample(x, k[-2:], mode)
 
-class Conv2d(Layer):
-    name = 'conv'
+def Concatenate(*xs, axis=0):
+    return select(xs[0]).concatenate(xs, axis=axis)
 
-    def __init__(self, c, n, w, g=(1,1), s=(1,1), d=(1,1), p=(1,1)):
-        """
-        c: in_channels
-        n: out_channels
-        w: kernel_size
-        g: groups
-        s: stride
-        d: dilation
-        p: padding
-        """
-        self.n, self.c, self.w = n, c, ls(w)
-        self.g, self.s, self.d = g, ls(s), ls(d)
-        self.p = ls(p)
+def Add(x1, x2): return x1 + x2
 
-        #self.K = np.zeros((n, c, *ls(w)), dtype=np.float32)
-        #self.bias = np.zeros(n, dtype=np.float32)
-
-    def para(self):
-        return self.n, self.c, self.w, self.s, self.d, self.p
-
-    def forward(self, x, K, B):
-        out = conv(x, K, self.g, self.p, self.s, self.d)
-        out += B.reshape(1, -1, 1, 1)
-        return out
-
-
-class ReLU(Layer):
-    name = 'relu'
-
-    def __init__(self): pass
-
-    def forward(self, x):
-        return np.multiply(x, x>0, out=x)
-
-class LeakyReLU(Layer):
-    name = 'leakyrelu'
-
-    def __init__(self, alpha=0.2):
-        self.alpha = alpha
-
-    def forward(self, x):
-        xalpha = x * self.alpha
-        x2 = np.array([x, xalpha])
-        x2 = x2.reshape((2,-1)).max(axis=0)
-        return x2.reshape(x.shape)
-
-class Flatten(Layer):
-    name = 'flatten'
-
-    def __init__(self): pass
-
-    def forward(self, x):
-        return x.reshape((x.shape[0], -1))
-
-
-class Sigmoid(Layer):
-    name = 'sigmoid'
-
-    def __init__(self): pass
-
-    def forward(self, x):
-        x *= -1; np.exp(x, out=x); x += 1
-        return np.divide(1, x, out=x)
-
-
-class Softmax(Layer):
-    name = 'softmax'
-
-    def __init__(self, axis=-1):
-        self.axis = axis
-
-    def forward(self, x):
-        eX = np.exp((x.T - np.max(x, axis=self.axis)).T)
-        return (eX.T / eX.sum(axis=self.axis)).T
-
-
-class Maxpool(Layer):
-    name = 'maxpool'
-
-    def __init__(self, w=(2,2), pad=(0,0), stride=(2,2)):
-        self.w, self.pad, self.stride = w, pad, stride
-
-    def para(self): return (self.w, self.pad, self.stride)
-
-    def forward(self, x):
-        return maxpool(x, self.w, self.pad, self.stride)
-
-
-class Avgpool(Layer):
-    name = 'avgpool'
-
-    def __init__(self, w=(2,2), pad=(0,0), stride=(2,2)):
-        self.w, self.pad, self.stride = w, pad, stride
-
-    def para(self): return (self.w, self.stride)
-
-    def forward(self, x):
-        return avgpool(x, self.w, self.pad, self.stride)
-
-
-class GlobalAveragePool(Layer):
-    name = 'gap'
-    def __init__(self): pass
-
-    def forward(self, x):
-        return x.mean(axis=(-2, -1), keepdims=True)
-
-
-class UpSample(Layer):
-    name = 'upsample'
-
-    def __init__(self, mode):
-        self.mode = mode
-
-    def para(self): return self.mode
-
-    def forward(self, x, k):
-        return upsample(x, k[-2:], self.mode)
-
-
-class Concatenate(Layer):
-    name = 'concat'
-
-    def __init__(self, axis): self.axis=axis
-
-    def forward(self, *xs):
-        return select(xs[0]).concatenate(xs, axis=self.axis)
-
-
-class Add(Layer):
-    name = 'add'
-
-    def __init__(self): pass
-
-    def forward(self, x1, x2):
-        return x1 + x2
-
-
-class Pow(Layer):
-    name = 'pow'
+def Pow(x, p): return np.power(x, p)
     
-    def forward(self, x, p):
-        return np.power(x, p)
+def Div(x1, x2): return x1 / x2
 
-    
-class Div(Layer):
-    name = 'div'
-    
-    def __init__(self): pass
-    
-    def forward(self, x1, x2):
-        return x1 / x2
+def ReduceSum(x, axis, keep_dim):
+    if keep_dim:
+        return np.expand_dims(x.sum(axis=axis), axis)
+    else: return x.sum(axis=axis)
 
-class ReduceSum(Layer):
-    name = 'reducesum'
-    
-    def __init__(self, axis, keep_dim):
-        self.axis = axis
-        self.keep_dim = keep_dim
-    
-    def forward(self, x):
-        if self.keep_dim:
-            return np.expand_dims(x.sum(axis=self.axis), self.axis)
-        else:
-            return x.sum(axis=self.axis)
+def BatchNorm(x, K, B):
+    x = x * K; x += B; return x
 
-class Unsqueeze(Layer):
-    name = 'unsqueeze'
-    
-    def __init__(self, dim):
-        self.dim = dim
-    
-    def forward(self, x):
-        return select(x).expand_dims(x, self.dim)
+def Unsqueeze(x, dim): return select(x).expand_dims(x, dim)
 
+def Mul(x1, x2): return x1 * x2
 
-class Mul(Layer):
-    name = 'mul'
+def Const(value=0, dtype='float32'): return value
 
-    def __init__(self): pass
+def Return(*x): return x
 
-    def forward(self, x1, x2):
-        return x1 * x2
+def LogSoftmax(x, axis=-1):
+    y = x - np.max(x, axis=axis, keepdims=True)
+    eX = np.sum(np.exp(y), axis=axis, keepdims=True)
+    y -= np.log(eX); return y
 
+def Shape(x): return cpu.array(x.shape, dtype=np.int64)
 
-class Const(Layer):
-    name = 'const'
+def Gather(x, idx, axis=0): return select(x).take(x, idx, axis=axis)
 
-    def __init__(self, v, tp): 
-        self.v = v
+def Reshape(x, shp): return x.reshape(shp)
 
-    def forward(self): 
-        return self.v
+def Transpose(x, axis): return x.transpose(axis)
 
+def ConstantofShape(x, value=0, dtype='float32'):
+    u = (np, cpu)['int' in dtype]
+    return u.full(x.ravel(), value, dtype=dtype)
 
-class ConstArray(Layer):
-    name = 'constarray'
-    def __init__(self, shp):
-        self.arr = np.zeros(shp, dtype=np.int64)
+def Split(x, indices, axis):
+    seg = cpu.cumsum(indices)
+    return select(x).split(x[:seg[-1]], seg[:-1], axis)
 
-    def forward(self, x): return self.arr
+def Tanh(x): return np.tanh(x)
 
-    def load(self, buf): 
-        self.arr.ravel()[:] = buf[:self.arr.size]
-        return self.arr.size
+def Slice(x, start, end, axis, step=None):
+    if step is None: step = [1]*len(start)
+    seas = [start, end, axis, step]
+    start, end, axis, step = [i for i in seas]
+    slis = [slice(None,None,None)] * x.ndim
+    for s, e, a, st in zip(start, end, axis, step):
+        slis[a] = slice(s, e, st)
+    return x[tuple(slis)]
 
+def Expand(x, shp):
+    ones = np.ones(shp, dtype=x.dtype)
+    return ones * x
 
-class Return(Layer):
-    name = 'return'
+def Cast(x, dtype='flaot32'): return x.astype(dtype)
 
-    def forward(self, *x):
-        return x
-    
+def Range(start, end, delta): return np.arange(start, end, delta)
 
-class BatchNorm(Layer):
-    name = 'batchnorm'
+def Equal(x1, x2): return select(x1).equal(x1, x2)
 
-    def __init__(self):
-        self.K = self.B = None
+def Where(msk, x1, x2): return select(msk).where(msk, x1, x2)
 
-    def forward(self, x, k, b, m, v):
-        K, B = self.eval(k, b, m, v)
-        x = x * K
-        x += B
-        return x
-        #return self.kv_inv*x + self.kmv_inv_b
-
-    def eval(self, k, b, m, v):
-        if not self.K is None: return self.K, self.B
-        v_inv = 1/np.sqrt(v + 1e-5)
-        kmv_inv_b = -k*m*v_inv + b
-        kv_inv = k*v_inv
-        kmv_inv_b.shape = kv_inv.shape = (1,-1,1,1)
-        self.K, self.B = kv_inv, kmv_inv_b
-        return kv_inv, kmv_inv_b
-
-class LogSoftmax(Layer):
-    name = 'logsoftmax'
-
-    def __init__(self, axis=-1):
-        self.axis = axis
-        
-    def forward(self, x):
-        y = x - np.max(x, axis=self.axis, keepdims=True)
-        eX = np.sum(np.exp(y), axis=self.axis, keepdims=True)
-        y -= np.log(eX); return y
-
-class Shape(Layer):
-    name = 'shape'
-
-    def forward(self, x): return cpu.array(x.shape, dtype=np.int64)
-
-class Gather(Layer):
-    name = 'gather'
-    def __init__(self, axis=0): 
-        self.axis = axis
-
-    def forward(self, x, idx): 
-        return select(x).take(x, idx, axis=self.axis)
-
-class Reshape(Layer):
-    name = 'reshape'
-
-    def forward(self, x, shp): 
-        return x.reshape(shp)
-
-class Transpose(Layer):
-    name = 'transpose'
-    def __init__(self, axis):
-        self.axis = axis
-
-    def forward(self, x): return x.transpose(self.axis)
-
-class ConstantofShape(Layer):
-    name = 'constantofshape'
-    def __init__(self, v=0, tp='float32'):
-        self.v, self.tp = v, tp
-
-    def forward(self, x):
-        u = (np, cpu)['int' in self.tp]
-        return u.full(x.ravel(), self.v, dtype=self.tp)
-
-class Split(Layer):
-    name = 'split'
-    def __init__(self, indices, axis):
-        self.indices, self.axis = indices, axis
-        self.seg = cpu.cumsum(self.indices)
-
-    def forward(self, x):
-        return select(x).split(x[:self.seg[-1]], self.seg[:-1], self.axis)
-
-class Tanh(Layer):
-    name = 'tanh'
-
-    def forward(self, x):
-        return np.tanh(x)
-
-class Slice(Layer):
-    name = 'slice'
-
-    def forward(self, x, start, end, axis, step=None):
-        if step is None: step = cpu.array([1]*len(start))
-        seas = [start, end, axis, step]
-        start, end, axis, step = [i for i in seas]
-        slis = [slice(None,None,None)] * x.ndim
-        for s, e, a, st in zip(start, end, axis, step):
-            slis[a] = slice(s, e, st)
-        return x[tuple(slis)]
-
-class Expand(Layer):
-    name = 'expand'
-
-    def forward(self, x, shp):
-        ones = np.ones(shp, dtype=x.dtype)
-        return ones * x
-
-class Cast(Layer):
-    name = 'cast'
-    def __init__(self, fmt): self.fmt = fmt
-
-    def forward(self, x):
-        return x.astype(self.fmt)
-
-class Range(Layer):
-    name = 'range'
-
-    def forward(self, start, end, delta):
-        return np.arange(start, end, delta)
-
-class Equal(Layer):
-    name = 'equal'
-
-    def forward(self, x1, x2):
-        return select(x1).equal(x1, x2)
-
-class Where(Layer):
-    name = 'where'
-
-    def forward(self, msk, x1, x2):
-        return select(msk).where(msk, x1, x2)
-
-class Scatternd(Layer):
-    name = 'scatternd'
-
-    def forward(self, data, indices, updates):
-        for i in range(len(indices[0])):
-            data = data.copy()
-            data[tuple(indices[0,i])] = updates[0,i]
-        return data
-        
+def Scatternd(data, indices, updates):
+    data = data.copy()
+    for i in range(len(indices[0])):
+        data[tuple(indices[0,i])] = updates[0,i]
+    return data
 
 layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU, 
              'leakyrelu': LeakyReLU, 'batchnorm': BatchNorm,
@@ -399,10 +136,8 @@ layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU,
              'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 
              'shape': Shape, 'gather':Gather, 'reshape':Reshape,
              'split':Split, 'tanh':Tanh, 'constantofshape':ConstantofShape,
-             'constarray':ConstArray, 'slice':Slice, 'expand':Expand,
-             'cast':Cast, 'range':Range, 'equal':Equal, 'where':Where,
-             'scatternd':Scatternd,
+             'slice':Slice, 'expand':Expand, 'cast':Cast, 'range':Range, 
+             'equal':Equal, 'where':Where, 'scatternd':Scatternd,
              'transpose':Transpose, 'logsoftmax':LogSoftmax, 'return':Return}
 
-if __name__ == "__main__":
-    pass
+if __name__ == "__main__": pass

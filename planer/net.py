@@ -1,19 +1,18 @@
-from .layer import layer_map as key
+from .layer import wrap, layer_map as key
 from time import time
 from .util import np
 
 class Net:
     def __init__(self):
-
         self.weights, self.body, self.flow = [], [], []
         self.life, self.timer = {}, {}
 
     def load_json(self, inputs, inits, body, flow, debug=False):
         self.body, self.flow, self.life = [], [], {}
         for i in body:
-            para = i[2] or []
+            para = i[2]
             if debug: print(i)
-            self.body.append((i[0], key[i[1]](*para)))
+            self.body.append((i[0], wrap(key[i[1]], i[1])(**para)))
         for i in range(len(flow)):
             keys = flow[i][0]
             if isinstance(keys, str): keys = [keys]
@@ -65,48 +64,6 @@ class Net:
                 self.timer[obj.name] += cost
         return rst[y][0] if len(rst[y])==1 else rst[y]
 
-    def layer2code(self, style='list'):
-        body = []
-        if style == 'list':
-            body = ['self.layer = [']
-            for i in self.body:
-                body.append('\t("%s", %s, %s),' % (i[0],
-                    i[1].__class__.__name__, i[1].para()))
-            body.append(']')
-        if style == 'self':
-            body = []
-            for i in self.body:
-                body.append('self.%s = %s%s' % (i[0],
-                    i[1].__class__.__name__, i[1].para() or ()))
-        return '\n'.join(body)
-
-    def layer2json(self):
-        body = []
-        invk = dict(zip(key.values(), key.keys()))
-        for i in self.body:
-            body.append((i[0], invk[i[1].__class__], i[1].para()))
-        return body
-
-    def flw2code(self, style='list'):
-        body = []
-        if style == 'list':
-            for x, ls, y in self.cmds:
-                for l in ls:
-                    out = x if l == ls[0] else y
-                    if isinstance(out, list):
-                        out = str(out).replace("'", '')
-                    body.append("%s = dic['%s'](%s)" % (y, l, out))
-                body.append('')
-        if style == 'self':
-            for x, ls, y in self.cmds:
-                for l in ls:
-                    out = x if l == ls[0] else y
-                    if isinstance(out, list):
-                        out = str(out).replace("'", '')
-                    body.append('%s = self.%s(%s)' % (y, l, out))
-                body.append('')
-        return '\n'.join(body)
-
     def load_weights(self, data):
         import numpy as cpu
         s, data = 0, data.view(dtype=np.uint8)
@@ -119,9 +76,9 @@ class Net:
                 value = cpu.array(value.tolist(), value.dtype)
                 self.weights[i] = value
                 
-    def show(self, info=True):
+    def show(self):
         from .plot import plot_net
-        plot_net(self.layer, self.flow, info).show()
+        plot_net(self.input, self.inits, self.layer, self.flow)
 
     def __call__(self, x, debug=False):
         return self.forward(x, debug)

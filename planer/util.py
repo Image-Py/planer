@@ -10,12 +10,12 @@ def pad(img, shp, mode='constant', constant_values=0):
     newimg[:,:,mh[0]:h+mh[0],mw[0]:w+mw[0]] = img
     return newimg
 
-def conv(img, core, group=1, mar=(1, 1), stride=(1, 1), dilation=(1, 1), mode='constant'):
-    (strh, strw), (dh, dw) = stride, dilation
+def conv(img, core, group=1, pads=(1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
+    (strh, strw), (dh, dw) = strides, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
     cimg_w = c * h * w * group
     cimg_h, i = (hi//strh)*(wi//strw), 0
-    shp = ((0, 0), (0, 0), (mar[0],)*2, (mar[1],)*2)
+    shp = ((0, 0), (0, 0), (pads[0],)*2, (pads[1],)*2)
     img = pad(img, shp, mode, constant_values=0)
     nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
     nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw
@@ -33,6 +33,7 @@ def conv(img, core, group=1, mar=(1, 1), stride=(1, 1), dilation=(1, 1), mode='c
     rst = [i.dot(j) for i, j in zip(col_core, col_img)]
     rst = rst[0] if group==1 else np.concatenate(rst)
     return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
+
 
 def pool(img, f, core=(2, 2), mar=None, stride=(2, 2),  const=0):
     (n, c, h, w), (ch, cw), (strh, strw) = img.shape, core, stride
