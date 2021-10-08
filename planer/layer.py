@@ -1,7 +1,7 @@
 from .util import conv, maxpool, upsample, avgpool, np
-import numpy as cpu
+import numpy; ep = None # numexpr
 
-def select(x): return (cpu, np)[isinstance(x, np.ndarray)]
+def select(x): return (numpy, np)[isinstance(x, np.ndarray)]
 
 def wrap(f, layername='layer'):
     class Layer:
@@ -19,10 +19,13 @@ def Dense(x, K, B, shp=None):
 
 def Conv2d(x, K, B, shp=None, group=(1,1), strides=(1,1), dilation=(1,1), pads=(1,1)):
     out = conv(x, K, group, pads, strides, dilation)
+    B = B.reshape(1, -1, 1, 1)
     out += B.reshape(1, -1, 1, 1)
     return out
 
-def ReLU(x): return np.multiply(x, x>0, out=x)
+def ReLU(x): 
+    if ep: return ep.evaluate('x * (x > 0)')
+    return np.multiply(x, x>0, out=x)
 
 def LeakyReLU(x, alpha=0.2):
     xalpha = x * alpha
@@ -33,6 +36,7 @@ def LeakyReLU(x, alpha=0.2):
 def Flatten(x): return x.reshape((x.shape[0], -1))
 
 def Sigmoid(x):
+    if ep: return ep.evaluate('1/(1+exp(-x))')
     x *= -1; np.exp(x, out=x); x += 1
     return np.divide(1, x, out=x)
 
@@ -55,7 +59,9 @@ def UpSample(x, k, mode='nearest'):
 def Concatenate(*xs, axis=0):
     return select(xs[0]).concatenate(xs, axis=axis)
 
-def Add(x1, x2): return x1 + x2
+def Add(x1, x2): 
+    if ep: return ep.evaluate('x1 + x2')
+    return x1 + x2
 
 def Pow(x, p): return np.power(x, p)
     
@@ -67,11 +73,14 @@ def ReduceSum(x, axis, keep_dim):
     else: return x.sum(axis=axis)
 
 def BatchNorm(x, K, B):
+    if ep: return ep.evaluate('x * K + B')
     x = x * K; x += B; return x
 
 def Unsqueeze(x, dim): return select(x).expand_dims(x, dim)
 
-def Mul(x1, x2): return x1 * x2
+def Mul(x1, x2): 
+    if ep: return ep.evaluate('x1 * x2')
+    return x1 + x2
 
 def Const(value=0, dtype='float32'): return value
 
@@ -82,7 +91,7 @@ def LogSoftmax(x, axis=-1):
     eX = np.sum(np.exp(y), axis=axis, keepdims=True)
     y -= np.log(eX); return y
 
-def Shape(x): return cpu.array(x.shape, dtype=np.int64)
+def Shape(x): return numpy.array(x.shape, dtype=np.int64)
 
 def Gather(x, idx, axis=0): return select(x).take(x, idx, axis=axis)
 
@@ -91,14 +100,16 @@ def Reshape(x, shp): return x.reshape(shp)
 def Transpose(x, axis): return x.transpose(axis)
 
 def ConstantofShape(x, value=0, dtype='float32'):
-    u = (np, cpu)['int' in dtype]
+    u = (np, numpy)['int' in dtype]
     return u.full(x.ravel(), value, dtype=dtype)
 
 def Split(x, indices, axis):
-    seg = cpu.cumsum(indices)
+    seg = numpy.cumsum(indices)
     return select(x).split(x[:seg[-1]], seg[:-1], axis)
 
-def Tanh(x): return np.tanh(x)
+def Tanh(x): 
+    if ep: return ep.evaluate('tanh(x)')
+    return np.tanh(x)
 
 def Slice(x, start, end, axis, step=None):
     if step is None: step = [1]*len(start)
