@@ -29,7 +29,7 @@ class Net:
         if hasattr(obj, 'shape'): return obj.shape
         return obj
 
-    def forward(self, x, debug=False):
+    def forward(self, *x, debug=False):
         dic = dict(self.body)
         rst = {'None': None}
         for k, v in zip(self.inits, self.weights): rst[k] = v

@@ -132,8 +132,8 @@ def make_slice(l, w, mar):
     r = np.linspace(0, l-w, math.ceil((l-mar)/(w-mar)))
     return [slice(i, i+w) for i in r.astype(int).tolist()]
 
-def grid_slice(H, W, w, h, mar):
-    a, b = make_slice(H, w, mar), make_slice(W, h, mar)
+def grid_slice(H, W, h, w, mar):
+    a, b = make_slice(H, h, mar), make_slice(W, w, mar)
     return list(itertools.product(a, b))
 
 def resize(img, size):

@@ -19,7 +19,6 @@ def Dense(x, K, B, shp=None):
 
 def Conv2d(x, K, B, shp=None, group=(1,1), strides=(1,1), dilation=(1,1), pads=(1,1)):
     out = conv(x, K, group, pads, strides, dilation)
-    B = B.reshape(1, -1, 1, 1)
     out += B.reshape(1, -1, 1, 1)
     return out
 
@@ -80,7 +79,7 @@ def Unsqueeze(x, dim): return select(x).expand_dims(x, dim)
 
 def Mul(x1, x2): 
     if ep: return ep.evaluate('x1 * x2')
-    return x1 + x2
+    return x1 * x2
 
 def Const(value=0, dtype='float32'): return value
 
