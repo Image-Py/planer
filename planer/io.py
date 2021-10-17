@@ -44,6 +44,8 @@ def onnx2planer(path, zip=True):
         inpara = [j for j in i.input]
         outpara = [j for j in i.output]
 
+
+
         if len(inpara)==1: inpara = inpara[0]
         if len(outpara)==1: outpara = outpara[0]
 
@@ -80,13 +82,10 @@ def onnx2planer(path, zip=True):
         elif i.op_type == 'GlobalAveragePool':
             layers.append([i.name, 'gap', {}])
         elif i.op_type == 'Upsample':
-            idx = values[i.input[1]][0]
-            inits[idx][2] = 'int64'
-            weights[idx] = weights[idx].astype(np.int64)
-            mode = i.attribute[0].s.decode('utf-8')
+            mode = i.attribute[0].s.decode()
             layers.append([i.name, 'upsample', {'mode':mode}])
         elif i.op_type == 'Resize':
-            flows[-1][0] = flows[-1][0][0]
+            flows[-1][0] = [flows[-1][0][j] for j in (0,2,3)]
             mode = i.attribute[2].s.decode()
             layers.append([i.name, 'upsample', {'mode':mode}])
         elif i.op_type == 'Flatten':
@@ -108,7 +107,7 @@ def onnx2planer(path, zip=True):
 
             buf = i.attribute[0].t.raw_data
             tp = types[i.attribute[0].t.data_type]
-            if len(buf)==0: continue
+            # if len(buf)==0: continue
             v = np.frombuffer(buf, tp).reshape(dim).tolist()
             layers.append([i.name, 'const', {'value':v, 'dtype':tp}])
         elif i.op_type == 'Pow':

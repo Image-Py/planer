@@ -29,7 +29,7 @@ class Net:
         if hasattr(obj, 'shape'): return obj.shape
         return obj
 
-    def forward(self, *x, debug=False):
+    def forward(self, x, debug=False):
         dic = dict(self.body)
         rst = {'None': None}
         for k, v in zip(self.inits, self.weights): rst[k] = v
@@ -71,10 +71,6 @@ class Net:
             buf = self.weights[i].view(dtype=np.uint8)
             buf.ravel()[:] = data[s:s+buf.size]
             s += buf.size
-            if 'int' in str(self.weights[i].dtype):
-                value = self.weights[i]
-                value = cpu.array(value.tolist(), value.dtype)
-                self.weights[i] = value
                 
     def show(self):
         from .plot import plot_net

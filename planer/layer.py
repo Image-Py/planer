@@ -1,7 +1,5 @@
 from .util import conv, maxpool, upsample, avgpool, np
-import numpy; ep = None # numexpr
-
-def select(x): return (numpy, np)[isinstance(x, np.ndarray)]
+ep = None # numexpr is help for numpy backend
 
 def wrap(f, layername='layer'):
     class Layer:
@@ -52,11 +50,12 @@ def Avgpool(x, w=(2,2), pads=(0,0), strides=(2,2)):
 def GlobalAveragePool(x):
     return x.mean(axis=(-2, -1), keepdims=True)
 
-def UpSample(x, k, mode='nearest'):
-    return upsample(x, k[-2:], mode)
+def UpSample(x, k, size=None, mode='nearest'):
+    if k.size == 0: k = size[-2:] // np.array(x.shape[-2:])
+    return upsample(x, k[-2:].tolist(), mode)
 
 def Concatenate(*xs, axis=0):
-    return select(xs[0]).concatenate(xs, axis=axis)
+    return np.concatenate(xs, axis=axis)
 
 def Add(x1, x2): 
     if ep: return ep.evaluate('x1 + x2')
@@ -75,13 +74,16 @@ def BatchNorm(x, K, B):
     if ep: return ep.evaluate('x * K + B')
     x = x * K; x += B; return x
 
-def Unsqueeze(x, dim): return select(x).expand_dims(x, dim)
+def Unsqueeze(x, dim): return np.expand_dims(x, dim)
 
 def Mul(x1, x2): 
     if ep: return ep.evaluate('x1 * x2')
     return x1 * x2
 
-def Const(value=0, dtype='float32'): return value
+def Const(value=0, dtype='float32'): 
+    if isinstance(value, list):
+        return np.array(value, dtype=dtype)
+    return value
 
 def Return(*x): return x
 
@@ -90,46 +92,47 @@ def LogSoftmax(x, axis=-1):
     eX = np.sum(np.exp(y), axis=axis, keepdims=True)
     y -= np.log(eX); return y
 
-def Shape(x): return numpy.array(x.shape, dtype=np.int64)
+def Shape(x): return np.array(x.shape)
 
-def Gather(x, idx, axis=0): return select(x).take(x, idx, axis=axis)
+def Gather(x, idx, axis=0): return np.take(x, idx, axis=axis)
 
-def Reshape(x, shp): return x.reshape(shp)
+def Reshape(x, shp): return x.reshape(shp.tolist())
 
 def Transpose(x, axis): return x.transpose(axis)
 
 def ConstantofShape(x, value=0, dtype='float32'):
-    u = (np, numpy)['int' in dtype]
-    return u.full(x.ravel(), value, dtype=dtype)
+    # u = (np, numpy)['int' in dtype]
+    return np.full(x.ravel().tolist(), value, dtype=dtype)
 
 def Split(x, indices, axis):
-    seg = numpy.cumsum(indices)
-    return select(x).split(x[:seg[-1]], seg[:-1], axis)
+    seg = np.cumsum(np.array(indices)).tolist()
+    return np.split(x[:seg[-1]], seg[:-1], axis)
 
 def Tanh(x): 
     if ep: return ep.evaluate('tanh(x)')
     return np.tanh(x)
 
 def Slice(x, start, end, axis, step=None):
-    if step is None: step = [1]*len(start)
+    if step is None: step = np.ones(len(start), dtype=np.uint32)
     seas = [start, end, axis, step]
-    start, end, axis, step = [i for i in seas]
+    start, end, axis, step = [i.tolist() for i in seas]
     slis = [slice(None,None,None)] * x.ndim
     for s, e, a, st in zip(start, end, axis, step):
         slis[a] = slice(s, e, st)
     return x[tuple(slis)]
 
 def Expand(x, shp):
-    ones = np.ones(shp, dtype=x.dtype)
+    ones = np.ones(shp.tolist(), dtype=x.dtype)
     return ones * x
 
 def Cast(x, dtype='flaot32'): return x.astype(dtype)
 
-def Range(start, end, delta): return np.arange(start, end, delta)
+def Range(start, end, delta): 
+    return np.arange(start, end, delta)
 
-def Equal(x1, x2): return select(x1).equal(x1, x2)
+def Equal(x1, x2): return np.equal(x1, x2)
 
-def Where(msk, x1, x2): return select(msk).where(msk, x1, x2)
+def Where(msk, x1, x2): return np.where(msk, x1, x2)
 
 def Scatternd(data, indices, updates):
     data = data.copy()
