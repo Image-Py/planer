@@ -7,6 +7,7 @@ from io import BytesIO
 
 def read_net(path, debug=False):
     net = Net()
+    path = path.replace('.onnx', '')
     if os.path.exists(path+'.pla'):
         with zipfile.ZipFile(path+'.pla') as f:
             path = os.path.split(path)[1]
@@ -21,7 +22,12 @@ def read_net(path, debug=False):
             lay, flw = body['layers'], body['flow']
             inputs, inits = body['input'], body['inits']
         weights = np.load(path+'.npy')
-    else: return print('model %s not found!'%path)
+    elif os.path.exists(path+'.onnx'):
+        body, weights = read_onnx(path+'.onnx')
+        lay, flw = body['layers'], body['flow']
+        inputs, inits = body['input'], body['inits']
+    else: 
+        return print('model %s not found!'%path)
     net.load_json(inputs, inits, lay, flw, debug)
     net.load_weights(weights)
     return net
@@ -29,7 +35,7 @@ def read_net(path, debug=False):
 types = [None, 'float32', 'uint8', 'int8', 'uint16', 'int16', 'int32', 'int64', 
     'str', 'bool', 'float16', 'float64', 'uint32', 'uint64', 'complex64', 'complex128']
 
-def onnx2planer(path, zip=True):
+def read_onnx(path):
     import numpy as np
     import onnx, onnx.numpy_helper
     graph = onnx.load(path).graph
@@ -166,14 +172,17 @@ def onnx2planer(path, zip=True):
         else:
             print('lost layer:', i.name)
             return i
+
     layers.append(['return', 'return', {}])
     flows.append([[i.name for i in graph.output], ['return'], 'plrst'])
     weights = np.hstack([i.view(dtype=np.uint8).ravel() for i in weights])
+    return {'input':input_para, 'inits':inits, 'layers':layers, 'flow':flows}, weights
 
+def onnx2pla(path, zip=True):
+    graph, weights = read_onnx(path)
     np.save(path.replace('onnx', 'npy'), weights)
     with open(path.replace('onnx', 'json'), 'w') as f:
-        json.dump({'input':input_para, 'inits':inits, 'layers':layers, 'flow':flows}, f)
-
+        json.dump(graph, f)
     if zip:
         with zipfile.ZipFile(path.replace('onnx', 'pla'), 'w') as f:
             f.write(path.replace('onnx','json'))

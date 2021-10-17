@@ -29,11 +29,12 @@ class Net:
         if hasattr(obj, 'shape'): return obj.shape
         return obj
 
-    def forward(self, x, debug=False):
+    def forward(self, *x, debug=False):
         dic = dict(self.body)
         rst = {'None': None}
         for k, v in zip(self.inits, self.weights): rst[k] = v
-        if not type(x) in (list, tuple): x = [x]
+        if type(x[0]) is dict: x = [x[0][i] for i in self.input]
+
         for k, v in zip(self.input, x): rst[k] = v
         for i in range(len(self.flow)):
             x, ls, y = self.flow[i]
@@ -64,6 +65,9 @@ class Net:
                 self.timer[obj.name] += cost
         return rst[y][0] if len(rst[y])==1 else rst[y]
 
+    def run(self, output=None, input={}):
+        return self.forward(input) # compatible with onnxruntime
+
     def load_weights(self, data):
         import numpy as cpu
         s, data = 0, data.view(dtype=np.uint8)
@@ -76,8 +80,8 @@ class Net:
         from .plot import plot_net
         plot_net(self.input, self.inits, self.layer, self.flow)
 
-    def __call__(self, x, debug=False):
-        return self.forward(x, debug)
+    def __call__(self, *x, **key):
+        return self.forward(*x, **key)
 
 
 if __name__ == '__main__':

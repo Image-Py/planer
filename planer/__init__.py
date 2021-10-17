@@ -1,7 +1,10 @@
 from .layer import *
 from .net import Net
-from .io import read_net, onnx2planer
+from .io import read_net, onnx2pla
 from .util import *
+
+# compatible with onnxruntime
+InferenceSession = read_net
 
 # planer array library
 pal = None
