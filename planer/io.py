@@ -43,6 +43,7 @@ def read_onnx(path):
     layers, inits, weights, flows, values = [], [], [], [], {}
     for i in graph.initializer: 
         v = onnx.numpy_helper.to_array(i)
+        if v.ndim==0: v = np.array([v])
         values[i.name] = len(weights), v.shape
         inits.append([i.name, v.shape, str(v.dtype)])
         weights.append(v)
@@ -91,7 +92,6 @@ def read_onnx(path):
             mode = i.attribute[0].s.decode()
             layers.append([i.name, 'upsample', {'mode':mode}])
         elif i.op_type == 'Resize':
-            flows[-1][0] = [flows[-1][0][j] for j in (0,2,3)]
             mode = i.attribute[2].s.decode()
             layers.append([i.name, 'upsample', {'mode':mode}])
         elif i.op_type == 'Flatten':

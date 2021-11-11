@@ -50,9 +50,9 @@ def Avgpool(x, w=(2,2), pads=(0,0), strides=(2,2)):
 def GlobalAveragePool(x):
     return x.mean(axis=(-2, -1), keepdims=True)
 
-def UpSample(x, k, size=None, mode='nearest'):
+def UpSample(x, roi, k, size=None, mode='nearest'):
     if k.size == 0: k = size[-2:] // np.array(x.shape[-2:])
-    return upsample(x, k[-2:].tolist(), mode)
+    return upsample(x, k[-2:].astype(int), mode)
 
 def Concatenate(*xs, axis=0):
     return np.concatenate(xs, axis=axis)
