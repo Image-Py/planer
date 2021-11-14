@@ -1,5 +1,5 @@
 import json, re, os
-import numpy as np
+import numpy, numpy as np
 from .net import Net
 from time import time
 import json, zipfile
@@ -24,6 +24,7 @@ def read_net(path, debug=False):
         weights = np.load(path+'.npy')
     elif os.path.exists(path+'.onnx'):
         body, weights = read_onnx(path+'.onnx')
+        if body == 'lost': return weights
         lay, flw = body['layers'], body['flow']
         inputs, inits = body['input'], body['inits']
     else: 
@@ -35,8 +36,16 @@ def read_net(path, debug=False):
 types = [None, 'float32', 'uint8', 'int8', 'uint16', 'int16', 'int32', 'int64', 
     'str', 'bool', 'float16', 'float64', 'uint32', 'uint64', 'complex64', 'complex128']
 
+def node(attrs, name, k=None): 
+    node = None
+    for i in attrs: 
+        if i.name==name: node = i
+    if k is None or node is None: 
+        return node
+    return getattr(node, k)
+
+
 def read_onnx(path):
-    import numpy as np
     import onnx, onnx.numpy_helper
     graph = onnx.load(path).graph
     input_para = [i.name for i in graph.input]
@@ -77,8 +86,12 @@ def read_onnx(path):
             layers.append([i.name, 'batchnorm', {}])
         elif i.op_type == 'Conv':
             attr, w = i.attribute, values[i.input[1]][1]
-            g, d, p, s = attr[1].i, list(attr[0].ints), list(attr[3].ints)[-2:], list(attr[4].ints)
-            layers.append([i.name, 'conv', {'shp':[w[1], w[0], w[2], w[3]], 'group':g, 'strides':s, 'dilation':d, 'pads':p}])
+            g = node(attr, 'group', 'i') or 1
+            d = node(attr, 'dilations', 'ints')
+            p = node(attr, 'pads', 'ints')
+            s = node(attr, 'strides', 'ints')
+            layers.append([i.name, 'conv', {'shp':[w[1], w[0], w[2], w[3]], 
+                'group':g, 'strides':s, 'dilation':d, 'pads':p}])
         elif i.op_type == 'Gemm':
             layers.append([i.name, 'dense', {'shp':list(values[i.input[1]][1][::-1])}])
         elif i.op_type == 'MaxPool':
@@ -92,11 +105,15 @@ def read_onnx(path):
             mode = i.attribute[0].s.decode()
             layers.append([i.name, 'upsample', {'mode':mode}])
         elif i.op_type == 'Resize':
-            mode = i.attribute[2].s.decode()
-            layers.append([i.name, 'upsample', {'mode':mode}])
+            mode = node(i.attribute, 'mode', 's').decode()
+            nearest_mode = node(i.attribute, 'nearest_mode', 's').decode()
+            trans_mode = node(i.attribute, 'coordinate_transformation_mode', 's').decode()
+            layers.append([i.name, 'resize', {'mode':mode, 'nearest_mode':nearest_mode, 
+                'coordinate_transformation_mode': trans_mode}])
         elif i.op_type == 'Flatten':
             layers.append([i.name, 'flatten', {}])
         elif i.op_type == 'Unsqueeze':
+            # return 'lost', i
             layers.append([i.name, 'unsqueeze', {'dim':i.attribute[0].ints[0]}])
         elif i.op_type == 'Relu':
             layers.append([i.name, 'relu', {}])
@@ -105,6 +122,8 @@ def read_onnx(path):
             layers.append([i.name, 'leakyrelu', {'alpha':alpha}])
         elif i.op_type == 'Add':
             layers.append([i.name, 'add', {}])
+        elif i.op_type == 'Sub':
+            layers.append([i.name, 'sub', {}])
         elif i.op_type == 'Div':
             layers.append([i.name, 'div', {}])
         elif i.op_type == 'Constant':
@@ -114,13 +133,16 @@ def read_onnx(path):
             buf = i.attribute[0].t.raw_data
             tp = types[i.attribute[0].t.data_type]
             # if len(buf)==0: continue
-            v = np.frombuffer(buf, tp).reshape(dim).tolist()
+            v = numpy.frombuffer(buf, tp).reshape(dim).tolist()
             layers.append([i.name, 'const', {'value':v, 'dtype':tp}])
         elif i.op_type == 'Pow':
             layers.append([i.name, 'pow', {}])
         elif i.op_type == 'ReduceSum':
-            axis, keep = i.attribute[0].ints[0], i.attribute[1].i
-            layers.append([i.name, 'reducesum', {'axis':axis, 'keep_dim':keep}])
+            axis, keep = i.attribute[0].ints, i.attribute[1].i
+            layers.append([i.name, 'reducesum', {'axis':axis, 'keepdims':keep}])
+        elif i.op_type == 'ReduceMean':
+            axis, keep = i.attribute[0].ints, i.attribute[1].i
+            layers.append([i.name, 'reducemean', {'axis':axis, 'keepdims':keep}])
         elif i.op_type == 'Concat':
             layers.append([i.name, 'concat', {'axis':i.attribute[0].i}])
         elif i.op_type == 'Pad':
@@ -128,6 +150,7 @@ def read_onnx(path):
         elif i.op_type == 'Sigmoid':
             layers.append([i.name, 'sigmoid', {}])
         elif i.op_type == 'AveragePool':
+            return i
             print('AveragePool IO, need review')
             for attr in i.attribute:
                 if 'stride' in attr.name: s = attr.ints[0]
@@ -136,7 +159,7 @@ def read_onnx(path):
         elif i.op_type == 'Shape':
             layers.append([i.name, 'shape', {}])
         elif i.op_type == 'Gather':
-            layers.append([i.name, 'gather', {'axis':i.attribute[0].i}])
+            layers.append([i.name, 'gather', {'axis':node(i.attribute, 'axis', 'i') or 0}])
         elif i.op_type == 'Mul':
             layers.append([i.name, 'mul', {}])
         elif i.op_type == 'Reshape':
@@ -149,12 +172,19 @@ def read_onnx(path):
             dim = i.attribute[0].t.dims
             buf = i.attribute[0].t.raw_data
             tp = types[i.attribute[0].t.data_type]
-            v = np.frombuffer(buf, tp).tolist()[0]
+            v = numpy.frombuffer(buf, tp).tolist()[0]
             layers.append([i.name, 'constantofshape', {'value':v, 'dtype':tp}])
         elif i.op_type == 'Split': 
-            layers.append([i.name, 'split', {'indices':list(i.attribute[1].ints), 'axis':i.attribute[0].i}])
+            split = node(i.attribute, 'split', 'ints')
+            para = {'axis': node(i.attribute, 'axis', 'i')}
+            if not split is None: para['split'] = list(split)
+            layers.append([i.name, 'split', para])
         elif i.op_type == 'Tanh': 
             layers.append([i.name, 'tanh', {}])
+        elif i.op_type == 'Exp': 
+            layers.append([i.name, 'exp', {}])
+        elif i.op_type == 'Log': 
+            layers.append([i.name, 'log', {}])
         elif i.op_type == 'Slice':
             layers.append([i.name, 'slice', {}])
         elif i.op_type == 'Expand':
@@ -169,9 +199,13 @@ def read_onnx(path):
             layers.append([i.name, 'where', {}])
         elif i.op_type == 'ScatterND':
             layers.append([i.name, 'scatternd', {}])
+        elif i.op_type == 'InstanceNormalization':
+            layers.append([i.name, 'instancenormalization', {'epsilon':i.attribute[0].f}])
+        elif i.op_type == 'Clip':
+            layers.append([i.name, 'clip', {}])
         else:
-            print('lost layer:', i.name)
-            return i
+            print('lost layer:', i.op_type)
+            return 'lost', i
 
     layers.append(['return', 'return', {}])
     flows.append([[i.name for i in graph.output], ['return'], 'plrst'])

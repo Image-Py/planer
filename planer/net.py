@@ -45,7 +45,7 @@ class Net:
                     p = [rst[i] for i in out]
                 else: p = [rst[out]]
                 xs = x if isinstance(x, list) else [x]
-                for k in xs: # release wasted obj
+                for k in set(xs): # release wasted obj
                     if self.life[k]<=i: del rst[k]
                 obj = dic[l]
                 start = time()
@@ -66,7 +66,8 @@ class Net:
         return rst[y][0] if len(rst[y])==1 else rst[y]
 
     def run(self, output=None, input={}):
-        return self.forward(input) # compatible with onnxruntime
+        rst = self.forward(input) # compatible with onnxruntime
+        return rst if isinstance(rst, tuple) else (rst,)
 
     def load_weights(self, data):
         import numpy as cpu

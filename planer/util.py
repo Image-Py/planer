@@ -90,18 +90,49 @@ def upsample_blinear(img, k):
     rst = rst.reshape((-1, ww, k[0], k[1]))
     rst = rst.transpose((0,2,1,3))
     rst = rst.reshape((n, c ,hh*k[0], ww*k[1]))
-    return rst[:,:,k[0]//2:hh*k[0]-k[0]//2,k[1]//2:ww*k[1]-k[1]//2]
+    return rst[:,:,k[0]//2:h*k[0]+k[0]//2,k[1]//2:w*k[1]+k[1]//2]
 
-def upsample_nearest(img, k):
+def offset(k, trans_mode, round_mode):
+    idx = np.arange(-64, 64)
+    if trans_mode == 'half_pixel':
+        idx = (idx + 0.5)/k - 0.5
+    if trans_mode == 'asymmetric':
+        idx = idx / k
+    if round_mode == 'round_prefer_floor':
+        idx = np.round(idx-1e-3)
+    if round_mode == 'round_prefer_ceil':
+        idx = np.round(idx+1e-3)
+    if round_mode == 'ceil':
+        idx = np.ceil(idx)
+    if round_mode == 'floor':
+        idx = np.floor(idx)
+    idx = idx.astype(np.int16)
+    return np.argmax(idx==0)-64
+
+def pix_offset(img, dr, dc):
     n, c, h, w = img.shape
-    rst = np.zeros((n, c, h*k[0], w*k[1]), dtype=np.float32)
+    if dr == dc == 0: return img
+    if dr>=0: sr1s, sr1e, sr2s, sr2e, sr, rr = dr, h, 0, h-dr, (0, dr), 0
+    else: sr1s, sr1e, sr2s, sr2e, sr, rr = 0, h+dr, -dr, h, (h+dr, h), h-1
+    if dc>=0: sc1s, sc1e, sc2s, sc2e, sc, cc = dc, w, 0, w-dc, (0, dc), 0
+    else: sr1r, sr1e, sr2s, sr2e, sc, cc = 0, w+dc, -dc, w, (w+dc, w), w-1
+    img[:, :, sr1s:sr1e, sc1s:sc1e] = img[:, :, sr2s:sr2e, sc2s:sc2e]
+    img[:, :, slice(*sr), :] = img[:, :, rr:rr+1, :]
+    img[:, :, :, slice(*sc)] = img[:, :, :, cc:cc+1]
+    return img
+
+def upsample_nearest(img, k, trans_mode='half-pixel', round_mode='round_prefer_ceil'):
+    n, c, h, w = img.shape
+    rst = np.zeros((n, c, h*k[0], w*k[1]), dtype=img.dtype)
     for r in range(k[0]):
         for c in range(k[1]):
             rst[:,:,r::k[0],c::k[1]]=img
-    return rst
 
-def upsample(img, k, mode):
-    if mode=='nearest': return upsample_nearest(img, k)
+    offr, offc = [offset(i, trans_mode, round_mode) for i in k]
+    return pix_offset(rst, offr, offc)
+
+def upsample(img, k, mode, trans_mode='half-pixcel', round_mode='round_prefer_ceil'):
+    if mode=='nearest': return upsample_nearest(img, k, trans_mode, round_mode)
     if mode=='linear': return upsample_blinear(img, k)
     
 # ===== below is some image process function =====
@@ -189,8 +220,9 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=p
             if isinstance(ssz, tuple): ssz = list(ssz)
             else: ssz = [int(h*ssz), int(w*ssz)]
             # 如果尺寸不足瓦片尺寸，则连同瓦片缩放到glob整数倍
-            if wsh>ssz[0]: wsh = ssz[0] = max(1, ssz[0]//gsz)*gsz
-            if wsw>ssz[1]: wsw = ssz[1] = max(1, ssz[1]//gsz)*gsz
+            from math import ceil
+            if wsh>ssz[0]: wsh = ssz[0] = ceil(ssz[0]/gsz)*gsz
+            if wsw>ssz[1]: wsw = ssz[1] = ceil(ssz[1]/gsz)*gsz
             if ssz!=[h, w]:img = resize(img, ssz)
             if isinstance(mar, float): mar = int(wsz*mar)
             rcs = grid_slice(*ssz, wsh, wsw, mar)
