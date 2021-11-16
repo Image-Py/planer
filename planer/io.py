@@ -71,7 +71,7 @@ def read_onnx(path):
         if i.op_type == 'BatchNormalization':
             cur = flows[-1]
             k, b, m, v = [weights[values[cur[0][j]][0]] for j in (1,2,3,4)]
-            v_inv = 1/np.sqrt(v + 1e-5)
+            v_inv = 1/numpy.sqrt(v + 1e-5)
             kmv_inv_b = -k*m*v_inv + b
             kv_inv = k*v_inv
             kmv_inv_b.shape = kv_inv.shape = (1,-1,1,1)

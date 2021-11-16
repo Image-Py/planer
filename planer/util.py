@@ -239,7 +239,7 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=p
             k = rst.shape[0]/(rcs[0][0].stop - rcs[0][0].start)
             if len(rcs)==1 and ssz!=[h, w]:
                 rst = resize(rst, (int(h*k), int(w*k)))
-            if len(rcs)==1: return np.asnumpy(rst)
+            if len(rcs)==1: return rst
             def sk(ss, k):
                 sr = slice(int(ss[0].start*k), int(ss[0].stop*k))
                 sc = slice(int(ss[1].start*k), int(ss[1].stop*k))
@@ -265,7 +265,7 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=p
             np.divide(buf, count, out=buf, casting='unsafe')
             if ssz!=[h, w]: 
                 buf = resize(buf, (int(h*k), int(w*k)))
-            return np.asnumpy(buf.astype(rst.dtype))
+            return buf.astype(rst.dtype)
         return wrap
     return wrapf
 
