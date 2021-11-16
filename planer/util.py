@@ -2,9 +2,6 @@ import numpy as np
 np.asnumpy = np.asarray
 from time import time
 
-conv_buf = []
-def clear_buf(): global conv_buf; conv_buf = []
-
 def pad(img, shp, mode='constant', constant_values=0):
     if shp[2][0]==shp[2][1]==shp[3][0]==shp[3][1]==0: return img
     if mode != 'constant': return np.pad(img, shp, mode)
@@ -13,31 +10,10 @@ def pad(img, shp, mode='constant', constant_values=0):
     newimg[:,:,mh[0]:h+mh[0],mw[0]:w+mw[0]] = img
     return newimg
 
-def conv(img, core, group=1, pads=(1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
-    (strh, strw), (dh, dw) = strides, dilation
-    (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
-    cimg_w = c * h * w * group
-    cimg_h, i = (hi//strh)*(wi//strw), 0
-    shp = ((0, 0), (0, 0), (pads[0],)*2, (pads[1],)*2)
-    img = pad(img, shp, mode, constant_values=0)
-    nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
-    nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw
-    nsh, nsw = nh * strh, nw * strw
-    ss = img.strides # n, c, h, w
-    shape = (ci, w, h,  ni, nh, nw)
-    strides  = (ss[-3], ss[-2]*dh, ss[-1]*dw, ss[-4], ss[-2]*strh, ss[-1]*strw)
-    col_img = np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides, writeable=False)
-    # col_img = np.zeros((ci, w*h,  ni, nh, nw), img.dtype) #(h*w, c, N, H, W)
-    # col_img = ddd[:ci*w*h*ni*nh*nw].reshape(ci, w*h,  ni, nh, nw)
-
-    col_core = core.reshape(group, core.shape[0]//group, -1)
-    col_img = col_img.reshape(group, cimg_w//group, -1)
-    rst = [i.dot(j) for i, j in zip(col_core, col_img)]
-    rst = rst[0] if group==1 else np.concatenate(rst)
-    return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
-
-
 from concurrent.futures import ThreadPoolExecutor
+
+conv_buf = []
+def clear_buf(): global conv_buf; conv_buf = []
 
 def conv(img, core, group=1, pads=(1, 1), stride=(1, 1), dilation=(1, 1), mode='constant'):
     global conv_buf
@@ -55,15 +31,12 @@ def conv(img, core, group=1, pads=(1, 1), stride=(1, 1), dilation=(1, 1), mode='
     size = ci * w * h * ni * nh * nw
     if len(conv_buf) < size: conv_buf = np.zeros(size, dtype=np.float32) 
     col_img = conv_buf[:size].reshape(ci, w*h,  ni, nh, nw) #(h*w, c, N, H, W)
-    
     def set_value(img, i, v): img[:,i] = v
     for r in range(0, h*dh, dh):
         for c in range(0, w*dw, dw):
-            #col_img[:,i], i = img[:,:,0+r:hi+r:strh, 0+c:wi+c:strw], i+1
             im, i = img[:,:,0+r:nsh+r:strh, 0+c:nsw+c:strw], i+1
             threadPool.submit(set_value, col_img, i-1, im)
     threadPool.shutdown(wait=True)
-    
     col_core = core.reshape((group, core.shape[0]//group, -1))
     col_img = col_img.reshape(group, cimg_w//group, -1)
     rst = [i.dot(j) for i, j in zip(col_core, col_img)]
@@ -263,29 +236,36 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=p
             rcs = grid_slice(*ssz, wsh, wsw, mar)
             if len(rcs)>1: info(1, len(rcs))
             rst = f(img[rcs[0]], *p[1:], **fp)
+            k = rst.shape[0]/(rcs[0][0].stop - rcs[0][0].start)
             if len(rcs)==1 and ssz!=[h, w]:
-                rst = resize(rst, (h,w))
+                rst = resize(rst, (int(h*k), int(w*k)))
             if len(rcs)==1: return np.asnumpy(rst)
-            outshp = img.shape[:2] + rst.shape[2:]
+            def sk(ss, k):
+                sr = slice(int(ss[0].start*k), int(ss[0].stop*k))
+                sc = slice(int(ss[1].start*k), int(ss[1].stop*k))
+                return sr, sc
+            outshp = int(img.shape[0]*k), int(img.shape[1]*k)
+            outshp = outshp + rst.shape[2:]
             weights = np.zeros(rst.shape[:2], dtype='uint16')
             if rst.ndim==3: weights = weights[:,:,None]
-            weights += mar + 1
-            for i in range(mar, 0, -1):
+            weights += int(mar * k) + 1
+            for i in range(int(mar*k), 0, -1):
                 weights[i-1,:] = weights[-i,:] = i
                 weights[:,i-1] = weights[:,-i] = i
-            rst *= weights
-            buf = np.zeros(outshp, dtype=rst.dtype)
+            buf = np.zeros(outshp, dtype=np.float32)
             count = np.zeros(outshp[:2], dtype='uint16')
             if rst.ndim==3: count = count[:,:,None]
-            buf[rcs[0]] = rst; count[rcs[0]] += weights
+            buf[sk(rcs[0], k)] = rst * weights
+            count[sk(rcs[0], k)] += weights
             for i in range(1, len(rcs)):
                 info(i+1, len(rcs))
                 rst = f(img[rcs[i]], *p[1:], **fp)
-                rst *= weights
-                buf[rcs[i]] += rst; count[rcs[i]] += weights
+                buf[sk(rcs[i], k)] += rst * weights
+                count[sk(rcs[i], k)] += weights
             np.divide(buf, count, out=buf, casting='unsafe')
-            if ssz!=(h, w): buf = resize(buf, (h,w))
-            return np.asnumpy(buf)
+            if ssz!=[h, w]: 
+                buf = resize(buf, (int(h*k), int(w*k)))
+            return np.asnumpy(buf.astype(rst.dtype))
         return wrap
     return wrapf
 

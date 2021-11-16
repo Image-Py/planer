@@ -25,9 +25,10 @@ def ReLU(x):
     return np.multiply(x, x>0, out=x)
 
 def LeakyReLU(x, alpha=0.2):
-    if ep: return ep.evaluate('where(x>0, x, x*alpha)')
-    y = (x>0) * np.array(1-alpha, 'float32')
-    y += alpha; return np.multiply(x, y, out=y)
+    a, b = np.float32(alpha), np.float32(1-alpha)
+    if ep: return ep.evaluate('x*((x>0)*b+a)')
+    y = (x>0) * b; y += a; 
+    return np.multiply(x, y, out=y)
 
 def Flatten(x): return x.reshape((x.shape[0], -1))
 
