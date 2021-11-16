@@ -177,7 +177,7 @@ def read_onnx(path):
         elif i.op_type == 'Split': 
             split = node(i.attribute, 'split', 'ints')
             para = {'axis': node(i.attribute, 'axis', 'i')}
-            if not split is None: para['split'] = list(split)
+            if not split is None: para['split'] = split
             layers.append([i.name, 'split', para])
         elif i.op_type == 'Tanh': 
             layers.append([i.name, 'tanh', {}])
@@ -202,7 +202,12 @@ def read_onnx(path):
         elif i.op_type == 'InstanceNormalization':
             layers.append([i.name, 'instancenormalization', {'epsilon':i.attribute[0].f}])
         elif i.op_type == 'Clip':
-            layers.append([i.name, 'clip', {}])
+            minv = node(i.attribute, 'min', 'f')
+            maxv = node(i.attribute, 'max', 'f')
+            para = {}
+            if minv: para['min']=minv
+            if maxv: para['max']=maxv
+            layers.append([i.name, 'clip', para])
         else:
             print('lost layer:', i.op_type)
             return 'lost', i

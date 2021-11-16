@@ -1,6 +1,6 @@
 from .layer import wrap, layer_map as key
 from time import time
-from .util import np
+from .util import np, clear_buf
 
 class Net:
     def __init__(self):
@@ -63,7 +63,13 @@ class Net:
                 if not obj.name in self.timer:
                     self.timer[obj.name] = 0
                 self.timer[obj.name] += cost
+        clear_buf()
         return rst[y][0] if len(rst[y])==1 else rst[y]
+
+    def timeit(self, status='start'):
+        if status == 'start': self.timer = {}
+        if status == 'end':
+            for i in self.timer: print(i, self.timer[i])
 
     def run(self, output=None, input={}):
         rst = self.forward(input) # compatible with onnxruntime

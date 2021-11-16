@@ -1,6 +1,6 @@
 from .layer import *
 from .net import Net
-from .io import read_net, onnx2pla
+from .io import *
 from .util import *
 
 # compatible with onnxruntime

@@ -25,10 +25,9 @@ def ReLU(x):
     return np.multiply(x, x>0, out=x)
 
 def LeakyReLU(x, alpha=0.2):
-    xalpha = x * alpha
-    x2 = np.array([x, xalpha])
-    x2 = x2.reshape((2,-1)).max(axis=0)
-    return x2.reshape(x.shape)
+    if ep: return ep.evaluate('where(x>0, x, x*alpha)')
+    y = (x>0) * np.array(1-alpha, 'float32')
+    y += alpha; return np.multiply(x, y, out=y)
 
 def Flatten(x): return x.reshape((x.shape[0], -1))
 
@@ -173,7 +172,8 @@ def InstanceNormalization(x, s, bias, epsilon=1e-5):
     x = x - mean; x *= s; x += bias
     return x
 
-def Clip(x, min, max): return np.clip(x, min, max)
+def Clip(x, min=0, max=1): 
+    return np.clip(x, min, max, out=x)
 
 layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU, 
              'leakyrelu': LeakyReLU, 'batchnorm': BatchNorm,

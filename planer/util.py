@@ -2,6 +2,9 @@ import numpy as np
 np.asnumpy = np.asarray
 from time import time
 
+conv_buf = []
+def clear_buf(): global conv_buf; conv_buf = []
+
 def pad(img, shp, mode='constant', constant_values=0):
     if shp[2][0]==shp[2][1]==shp[3][0]==shp[3][1]==0: return img
     if mode != 'constant': return np.pad(img, shp, mode)
@@ -20,20 +23,52 @@ def conv(img, core, group=1, pads=(1, 1), strides=(1, 1), dilation=(1, 1), mode=
     nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
     nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw
     nsh, nsw = nh * strh, nw * strw
-
     ss = img.strides # n, c, h, w
     shape = (ci, w, h,  ni, nh, nw)
     strides  = (ss[-3], ss[-2]*dh, ss[-1]*dw, ss[-4], ss[-2]*strh, ss[-1]*strw)
-    col_img = np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides)
+    col_img = np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides, writeable=False)
+    # col_img = np.zeros((ci, w*h,  ni, nh, nw), img.dtype) #(h*w, c, N, H, W)
+    # col_img = ddd[:ci*w*h*ni*nh*nw].reshape(ci, w*h,  ni, nh, nw)
 
     col_core = core.reshape(group, core.shape[0]//group, -1)
     col_img = col_img.reshape(group, cimg_w//group, -1)
-
-    if group>1: print(group, col_core.shape, col_img.shape)
     rst = [i.dot(j) for i, j in zip(col_core, col_img)]
     rst = rst[0] if group==1 else np.concatenate(rst)
     return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
 
+
+from concurrent.futures import ThreadPoolExecutor
+
+def conv(img, core, group=1, pads=(1, 1), stride=(1, 1), dilation=(1, 1), mode='constant'):
+    global conv_buf
+    threadPool = ThreadPoolExecutor(max_workers=9) # for 3x3 core
+    (strh, strw), (dh, dw) = stride, dilation
+    (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
+    cimg_w = c * h * w * group
+    cimg_h, i = (hi//strh)*(wi//strw), 0
+    shp = ((0, 0), (0, 0), (pads[0],)*2, (pads[1],)*2)
+    img = pad(img, shp, mode, constant_values=0)
+    img = img.transpose((1,0,2,3)) # nchw -> cnhw
+    nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
+    nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw
+    nsh, nsw = nh * strh, nw * strw
+    size = ci * w * h * ni * nh * nw
+    if len(conv_buf) < size: conv_buf = np.zeros(size, dtype=np.float32) 
+    col_img = conv_buf[:size].reshape(ci, w*h,  ni, nh, nw) #(h*w, c, N, H, W)
+    
+    def set_value(img, i, v): img[:,i] = v
+    for r in range(0, h*dh, dh):
+        for c in range(0, w*dw, dw):
+            #col_img[:,i], i = img[:,:,0+r:hi+r:strh, 0+c:wi+c:strw], i+1
+            im, i = img[:,:,0+r:nsh+r:strh, 0+c:nsw+c:strw], i+1
+            threadPool.submit(set_value, col_img, i-1, im)
+    threadPool.shutdown(wait=True)
+    
+    col_core = core.reshape((group, core.shape[0]//group, -1))
+    col_img = col_img.reshape(group, cimg_w//group, -1)
+    rst = [i.dot(j) for i, j in zip(col_core, col_img)]
+    rst = rst[0] if group==1 else np.concatenate(rst)
+    return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
 
 def pool(img, f, core=(2, 2), mar=None, stride=(2, 2),  const=0):
     (n, c, h, w), (ch, cw), (strh, strw) = img.shape, core, stride
