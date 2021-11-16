@@ -34,17 +34,17 @@ def Flatten(x): return x.reshape((x.shape[0], -1))
 
 def Sigmoid(x):
     if ep: return ep.evaluate('1/(1+exp(-x))')
-    x *= -1; np.exp(x, out=x); x += 1
+    x = -x; np.exp(x, out=x); x += 1
     return np.divide(1, x, out=x)
 
 def Softmax(x, axis=-1):
     eX = np.exp((x.T - np.max(x, axis=self.axis)).T)
     return (eX.T / eX.sum(axis=self.axis)).T
 
-def Maxpool(x, w=(2,2), pads=(0,0), strides=(2,2)):
+def Maxpool(x, w=(2,2), pads=(0,0,0,0), strides=(2,2)):
     return maxpool(x, w, pads, strides)
 
-def Avgpool(x, w=(2,2), pads=(0,0), strides=(2,2)):
+def Avgpool(x, w=(2,2), pads=(0,0,0,0), strides=(2,2)):
     return avgpool(x, w, pads, strides)
 
 def GlobalAveragePool(x):

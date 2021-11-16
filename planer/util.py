@@ -1,6 +1,7 @@
 import numpy, numpy as np
 np.asnumpy = np.asarray
 from time import time
+cn = None # cudnn
 
 def pad(img, shp, mode='constant', constant_values=0):
     if shp[2][0]==shp[2][1]==shp[3][0]==shp[3][1]==0: return img
@@ -15,13 +16,13 @@ from concurrent.futures import ThreadPoolExecutor
 conv_buf = []
 def clear_buf(): global conv_buf; conv_buf = []
 
-def conv_np(img, core, group=1, pads=(1, 1), stride=(1, 1), dilation=(1, 1), mode='constant'):
+def conv_np(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
     threadPool = ThreadPoolExecutor(max_workers=9) # for 3x3 core
-    (strh, strw), (dh, dw) = stride, dilation
+    (strh, strw), (dh, dw) = strides, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
     cimg_w = c * h * w * group
     cimg_h, i = (hi//strh)*(wi//strw), 0
-    shp = ((0, 0), (0, 0), (pads[0],)*2, (pads[1],)*2)
+    shp = (0, 0), (0, 0), (pads[0], pads[2]), (pads[1], pads[3])
     img = pad(img, shp, mode, constant_values=0)
     nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
     nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw
@@ -45,12 +46,12 @@ def conv_np(img, core, group=1, pads=(1, 1), stride=(1, 1), dilation=(1, 1), mod
     rst = rst[0] if group==1 else np.concatenate(rst)
     return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
 
-def conv_cp(img, core, group=1, pads=(1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
+def conv_cp(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
     (strh, strw), (dh, dw) = strides, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
     cimg_w = c * h * w * group
     cimg_h, i = (hi//strh)*(wi//strw), 0
-    shp = ((0, 0), (0, 0), (pads[0],)*2, (pads[1],)*2)
+    shp = (0, 0), (0, 0), (pads[0], pads[2]), (pads[1], pads[3])
     img = pad(img, shp, mode, constant_values=0)
     nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
     nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw
@@ -66,13 +67,26 @@ def conv_cp(img, core, group=1, pads=(1, 1), strides=(1, 1), dilation=(1, 1), mo
     rst = rst[0] if group==1 else np.concatenate(rst)
     return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
 
-def conv(img, core, group=1, pads=(1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
+def conv_dnn(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
+    (strh, strw), (dh, dw) = strides, dilation
+    (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
+    shp = (0, 0), (0, 0), (pads[0], pads[2]), (pads[1], pads[3])
+    img = pad(img, shp, mode, constant_values=0)
+    nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
+    nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw    
+    y = np.zeros((ni, n, nh, nw), dtype='float32')
+    cn.convolution_forward(img, core, None, y, (0, 0), 
+        (strides[0], strides[1]), (dilation[0], dilation[1]), 1, auto_tune=True, tensor_core='always')
+    return y
+
+def conv(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
     if np is numpy: return conv_np(img, core, group, pads, strides, dilation, mode)
+    elif cn: return conv_dnn(img, core, group, pads, strides, dilation, mode)
     else: return conv_cp(img, core, group, pads, strides, dilation, mode)
 
-def pool(img, f, core=(2, 2), mar=None, stride=(2, 2),  const=0):
+def pool(img, f, core=(2, 2), pads=(0,0,0,0), stride=(2, 2),  const=0):
     (n, c, h, w), (ch, cw), (strh, strw) = img.shape, core, stride
-    shp = ((0, 0), (0, 0), (mar[0],)*2, (mar[1],)*2)
+    shp = ((0, 0), (0, 0), (pads[0], pads[2]), (pads[1], pads[3]))
     img = pad(img, shp, 'constant', constant_values=0)
     (imn, ic, ih, iw), imgs = img.shape, []
     dh = (h + sum(shp[2]) - core[0] + strh)//strh
@@ -85,10 +99,10 @@ def pool(img, f, core=(2, 2), mar=None, stride=(2, 2),  const=0):
             f(img[:,:,r:nsh+r:strh,c:nsw+c:strw], buf, out=buf)
     return buf
 
-def maxpool(i, c=(2, 2), mar=(0,0), s=(2, 2)):
+def maxpool(i, c=(2, 2), mar=(0,0,0,0), s=(2, 2)):
     return pool(i, np.maximum, c, mar, s, -1e4)
 
-def avgpool(i, c=(2, 2), mar=(0,0), s=(2, 2)):
+def avgpool(i, c=(2, 2), mar=(0,0,0,0), s=(2, 2)):
     rst = pool(i, np.add, c, mar, s, 0)
     rst /= c[0] * c[1]
     return rst

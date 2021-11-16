@@ -98,7 +98,7 @@ def read_onnx(path):
             ks = ['kernel_shape', 'pads', 'strides']
             names = [j.name for j in i.attribute]
             w, m, s = [i.attribute[names.index(j)].ints for j in ks]
-            layers.append([i.name, 'maxpool', {'w':list(w), 'pads':list(m[2:]), 'strides':list(s)}])
+            layers.append([i.name, 'maxpool', {'w':w, 'pads':m, 'strides':s}])
         elif i.op_type == 'GlobalAveragePool':
             layers.append([i.name, 'gap', {}])
         elif i.op_type == 'Upsample':
