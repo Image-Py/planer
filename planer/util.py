@@ -1,7 +1,6 @@
 import numpy, numpy as np
 np.asnumpy = np.asarray
 from time import time
-cn = None # cudnn
 
 def pad(img, shp, mode='constant', constant_values=0):
     if shp[2][0]==shp[2][1]==shp[3][0]==shp[3][1]==0: return img
@@ -27,7 +26,7 @@ def conv_np(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 
     nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
     nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw
     nsh, nsw = nh * strh, nw * strw
-
+    # ============================================
     global conv_buf
     img = img.transpose((1,0,2,3)) # nchw -> cnhw
     size = ci * w * h * ni * nh * nw
@@ -39,7 +38,7 @@ def conv_np(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 
             im, i = img[:,:,0+r:nsh+r:strh, 0+c:nsw+c:strw], i+1
             threadPool.submit(set_value, col_img, i-1, im)
     threadPool.shutdown(wait=True)
-
+    # ============================================
     col_core = core.reshape((group, core.shape[0]//group, -1))
     col_img = col_img.reshape(group, cimg_w//group, -1)
     rst = [i.dot(j) for i, j in zip(col_core, col_img)]
@@ -56,18 +55,18 @@ def conv_cp(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 
     nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
     nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw
     nsh, nsw = nh * strh, nw * strw
-
+    # ============================================
     ss, shape = img.strides, (ci, w, h,  ni, nh, nw)
     strides  = (ss[-3], ss[-2]*dh, ss[-1]*dw, ss[-4], ss[-2]*strh, ss[-1]*strw)
     col_img = np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides)
-
+    # ============================================
     col_core = core.reshape(group, core.shape[0]//group, -1)
     col_img = col_img.reshape(group, cimg_w//group, -1)
     rst = [i.dot(j) for i, j in zip(col_core, col_img)]
     rst = rst[0] if group==1 else np.concatenate(rst)
     return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
 
-def conv_dnn(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
+def conv_dnn(img, core, bias=None, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
     (strh, strw), (dh, dw) = strides, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
     shp = (0, 0), (0, 0), (pads[0], pads[2]), (pads[1], pads[3])
@@ -75,14 +74,9 @@ def conv_dnn(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1,
     nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
     nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw    
     y = np.zeros((ni, n, nh, nw), dtype='float32')
-    cn.convolution_forward(img, core, None, y, (0, 0), 
+    dnn.convolution_forward(img, core, bias, y, (0, 0), 
         (strides[0], strides[1]), (dilation[0], dilation[1]), 1, auto_tune=True, tensor_core='always')
     return y
-
-def conv(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
-    if np is numpy: return conv_np(img, core, group, pads, strides, dilation, mode)
-    elif cn: return conv_dnn(img, core, group, pads, strides, dilation, mode)
-    else: return conv_cp(img, core, group, pads, strides, dilation, mode)
 
 def pool(img, f, core=(2, 2), pads=(0,0,0,0), stride=(2, 2),  const=0):
     (n, c, h, w), (ch, cw), (strh, strw) = img.shape, core, stride

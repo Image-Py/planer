@@ -16,11 +16,11 @@ try: import numpy as np
 except: np == None
 try: import numexpr as ep
 except: ep = None
-try: import cupy.cudnn as cn
-except: cn = None
+try: import cupy.cudnn as dnn
+except: dnn = None
 
 print('numpy:[%s] numexpr:[%s] cupy:[%s] cudnn:[%s] '%tuple(
-	[('installed', '--')[i is None] for i in (np, ep, cp, cn)]))
+	[('installed', '--')[i is None] for i in (np, ep, cp, dnn)]))
 
 def core(obj, silent=False):
 	global pal; pal = obj
@@ -31,11 +31,11 @@ def core(obj, silent=False):
 	#except: ep = None
 
 	layer.ep = ep if obj.__name__ == 'numpy' else None
-	util.cn = cn if obj.__name__ == 'cupy' else None
+	layer.dnn = util.dnn = dnn if obj.__name__ == 'cupy' else None
 
 	if obj.__name__=='numpy' and ep is None:
 		print('numexpr is not installed, optional but recommended.')
-	if obj.__name__=='cupy' and cn is None:
+	if obj.__name__=='cupy' and dnn is None:
 		print('cudnn is not installed, optional but recommended.')
 	pal.cpu = pal.asnumpy if 'asnumpy' in dir(pal) else pal.asarray
 	if not silent: print('\nuser switch engine:', obj.__name__)   

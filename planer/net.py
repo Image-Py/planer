@@ -76,7 +76,6 @@ class Net:
         return rst if isinstance(rst, tuple) else (rst,)
 
     def load_weights(self, data):
-        import numpy as cpu
         s, data = 0, data.view(dtype=np.uint8)
         for i in range(len(self.weights)):
             buf = self.weights[i].view(dtype=np.uint8)

@@ -1,5 +1,6 @@
-from .util import conv, maxpool, upsample, avgpool, np
-ep = None # numexpr is help for numpy backend
+from .util import maxpool, upsample, avgpool, np
+from .util import conv_np, conv_cp, conv_dnn
+ep, dnn = None, None # numexpr is help for numpy backend
 
 def wrap(f, layername='layer'):
     class Layer:
@@ -15,10 +16,11 @@ def Dense(x, K, B, shp=None):
     y += B.reshape((1, -1))
     return y
 
-def Conv2d(x, K, B=None, shp=None, group=(1,1), strides=(1,1), dilation=(1,1), pads=(1,1)):
-    out = conv(x, K, group, pads, strides, dilation)
-    if not B is None: out += B.reshape(1, -1, 1, 1)
-    return out
+def Conv2d(x, K, B=None, shp=None, group=(1,1), strides=(1,1), dilation=(1,1), pads=(1,1,1,1)):
+    if np.__name__ == 'numpy': out = conv_np(x, K, group, pads, strides, dilation)
+    elif not dnn is None: return conv_dnn(x, K, B, group, pads, strides, dilation)
+    else: out = conv_cp(x, K, group, pads, strides, dilation)
+    return out if B is None else np.add(out, B.reshape(1, -1, 1, 1), out=out)
 
 def ReLU(x): 
     if ep: return ep.evaluate('x * (x > 0)')
@@ -95,8 +97,6 @@ def Const(value=0, dtype='float32'):
     if isinstance(value, list):
         return np.array(value, dtype=dtype)
     return value
-
-def Return(*x): return x
 
 def LogSoftmax(x, axis=-1):
     y = x - np.max(x, axis=axis, keepdims=True)
@@ -175,6 +175,8 @@ def InstanceNormalization(x, s, bias, epsilon=1e-5):
 
 def Clip(x, min=0, max=1): 
     return np.clip(x, min, max, out=x)
+
+def Return(*x): return x
 
 layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU, 
              'leakyrelu': LeakyReLU, 'batchnorm': BatchNorm,
