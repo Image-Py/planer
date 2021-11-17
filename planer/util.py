@@ -70,11 +70,12 @@ def conv_dnn(img, core, bias=None, group=1, pads=(1, 1, 1, 1), strides=(1, 1), d
     (strh, strw), (dh, dw) = strides, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
     shp = (0, 0), (0, 0), (pads[0], pads[2]), (pads[1], pads[3])
-    img = pad(img, shp, mode, constant_values=0)
+    if pads[0]==pads[2] and pads[1]==pads[3]: pads = (pads[0], pads[2])
+    else: img, pads = pad(img, shp, mode, constant_values=0), (0,0)
     nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
     nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw    
     y = np.zeros((ni, n, nh, nw), dtype='float32')
-    dnn.convolution_forward(img, core, bias, y, (0, 0), 
+    dnn.convolution_forward(img, core, bias, y, pads, 
         (strides[0], strides[1]), (dilation[0], dilation[1]), 1, auto_tune=True, tensor_core='always')
     return y
 

@@ -9,7 +9,6 @@ InferenceSession = read_net
 # planer array library
 pal = None
 
-
 try: import cupy as cp
 except: cp = None
 try: import numpy as np
@@ -26,7 +25,6 @@ def core(obj, silent=False):
 	global pal; pal = obj
 	from . import util, layer, net, io
 	util.np = layer.np = net.np = io.np = obj
-
 	#try: import numexpr as ep
 	#except: ep = None
 
