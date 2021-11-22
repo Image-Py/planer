@@ -1,6 +1,7 @@
 from .util import maxpool, upsample, avgpool, np
-from .util import conv_np, conv_cp, conv_dnn
+from .util import conv_for, conv_stride, conv_dnn
 ep, dnn = None, None # numexpr is help for numpy backend
+import numpy
 
 def wrap(f, layername='layer'):
     class Layer:
@@ -17,9 +18,9 @@ def Dense(x, K, B, shp=None):
     return y
 
 def Conv2d(x, K, B=None, shp=None, group=(1,1), strides=(1,1), dilation=(1,1), pads=(1,1,1,1)):
-    if np.__name__ == 'numpy': out = conv_np(x, K, group, pads, strides, dilation)
+    if np is numpy: out = conv_for(x, K, group, pads, strides, dilation)
     elif not dnn is None: return conv_dnn(x, K, B, group, pads, strides, dilation)
-    else: out = conv_cp(x, K, group, pads, strides, dilation)
+    else: out = conv_stride(x, K, group, pads, strides, dilation)
     return out if B is None else np.add(out, B.reshape(1, -1, 1, 1), out=out)
 
 def ReLU(x): 
@@ -86,7 +87,7 @@ def BatchNorm(x, K, B):
     if ep: return ep.evaluate('x * K + B')
     x = x * K; x += B; return x
 
-def Unsqueeze(x, dim): return np.expand_dims(x, dim)
+def Unsqueeze(x, axis=None): return np.expand_dims(x, tuple(axis))
 
 def Mul(x1, x2): 
     if ep: return ep.evaluate('x1 * x2')
@@ -114,7 +115,6 @@ def Reshape(x, shp):
 def Transpose(x, axis): return x.transpose(axis)
 
 def ConstantofShape(x, value=0, dtype='float32'):
-    # u = (np, numpy)['int' in dtype]
     return np.full(x.ravel().tolist(), value, dtype=dtype)
 
 def Split(x, split=None, axis=0):

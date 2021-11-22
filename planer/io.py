@@ -42,7 +42,9 @@ def node(attrs, name, k=None):
         if i.name==name: node = i
     if k is None or node is None: 
         return node
-    return getattr(node, k)
+    rst = getattr(node, k)
+    if k=='ints': rst = list(rst)
+    return rst
 
 
 def read_onnx(path):
@@ -95,9 +97,9 @@ def read_onnx(path):
         elif i.op_type == 'Gemm':
             layers.append([i.name, 'dense', {'shp':list(values[i.input[1]][1][::-1])}])
         elif i.op_type == 'MaxPool':
-            ks = ['kernel_shape', 'pads', 'strides']
-            names = [j.name for j in i.attribute]
-            w, m, s = [i.attribute[names.index(j)].ints for j in ks]
+            w = node(i.attribute, 'kernel_shape', 'ints')
+            m = node(i.attribute, 'pads', 'ints')
+            s = node(i.attribute, 'strides', 'ints')
             layers.append([i.name, 'maxpool', {'w':w, 'pads':m, 'strides':s}])
         elif i.op_type == 'GlobalAveragePool':
             layers.append([i.name, 'gap', {}])
@@ -113,8 +115,8 @@ def read_onnx(path):
         elif i.op_type == 'Flatten':
             layers.append([i.name, 'flatten', {}])
         elif i.op_type == 'Unsqueeze':
-            # return 'lost', i
-            layers.append([i.name, 'unsqueeze', {'dim':i.attribute[0].ints[0]}])
+            axis = node(i.attribute, 'axes', 'ints')
+            layers.append([i.name, 'unsqueeze', {} if axis is None else {'axis':axis}])
         elif i.op_type == 'Relu':
             layers.append([i.name, 'relu', {}])
         elif i.op_type == 'LeakyRelu':
@@ -138,10 +140,12 @@ def read_onnx(path):
         elif i.op_type == 'Pow':
             layers.append([i.name, 'pow', {}])
         elif i.op_type == 'ReduceSum':
-            axis, keep = i.attribute[0].ints, i.attribute[1].i
+            axis = node(i.attribute, 'axes', 'ints')
+            keep = node(i.attribute, 'keepdims', 'i')
             layers.append([i.name, 'reducesum', {'axis':axis, 'keepdims':keep}])
         elif i.op_type == 'ReduceMean':
-            axis, keep = i.attribute[0].ints, i.attribute[1].i
+            axis = node(i.attribute, 'axes', 'ints')
+            keep = node(i.attribute, 'keepdims', 'i')
             layers.append([i.name, 'reducemean', {'axis':axis, 'keepdims':keep}])
         elif i.op_type == 'Concat':
             layers.append([i.name, 'concat', {'axis':i.attribute[0].i}])
@@ -165,7 +169,7 @@ def read_onnx(path):
         elif i.op_type == 'Reshape':
             layers.append([i.name, 'reshape', {}])
         elif i.op_type == 'Transpose':
-            layers.append([i.name, 'transpose', {'axis':list(i.attribute[0].ints)}])
+            layers.append([i.name, 'transpose', {'axis':node(i.attribute, 'perm', 'ints')}])
         elif i.op_type == 'LogSoftmax':
             layers.append([i.name, 'logsoftmax', {'axis':i.attribute[0].i}])
         elif i.op_type == 'ConstantOfShape': 

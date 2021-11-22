@@ -8,11 +8,9 @@ InferenceSession = read_net
 
 # planer array library
 pal = None
-
+import numpy as np
 try: import cupy as cp
 except: cp = None
-try: import numpy as np
-except: np == None
 try: import numexpr as ep
 except: ep = None
 try: import cupy.cudnn as dnn
@@ -35,12 +33,12 @@ def core(obj, silent=False):
 		print('numexpr is not installed, optional but recommended.')
 	if obj.__name__=='cupy' and dnn is None:
 		print('cudnn is not installed, optional but recommended.')
-	pal.cpu = pal.asnumpy if 'asnumpy' in dir(pal) else pal.asarray
+	pal.asnumpy = pal.asnumpy if 'asnumpy' in dir(pal) else pal.asarray
 	if not silent: print('\nuser switch engine:', obj.__name__)   
 	return pal 
 
 core(np, True)
 
-def asnumpy(arr, **key): return pal.cpu(arr, **key)
+def asnumpy(arr, **key): return pal.asnumpy(arr, **key)
 
 def asarray(arr, **key): return pal.asarray(arr, **key)

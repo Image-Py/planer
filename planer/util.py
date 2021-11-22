@@ -1,5 +1,4 @@
 import numpy, numpy as np
-np.asnumpy = np.asarray
 from time import time
 
 def pad(img, shp, mode='constant', constant_values=0):
@@ -15,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 conv_buf = []
 def clear_buf(): global conv_buf; conv_buf = []
 
-def conv_np(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
+def conv_for(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
     threadPool = ThreadPoolExecutor(max_workers=9) # for 3x3 core
     (strh, strw), (dh, dw) = strides, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
@@ -26,7 +25,7 @@ def conv_np(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 
     nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
     nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw
     nsh, nsw = nh * strh, nw * strw
-    # ============================================
+    # ================ img 2 col ================
     global conv_buf
     img = img.transpose((1,0,2,3)) # nchw -> cnhw
     size = ci * w * h * ni * nh * nw
@@ -45,7 +44,7 @@ def conv_np(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 
     rst = rst[0] if group==1 else np.concatenate(rst)
     return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
 
-def conv_cp(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
+def conv_stride(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 1), mode='constant'):
     (strh, strw), (dh, dw) = strides, dilation
     (n, c, h, w), (ni, ci, hi, wi)  = core.shape, img.shape
     cimg_w = c * h * w * group
@@ -55,7 +54,7 @@ def conv_cp(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1, 
     nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
     nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw
     nsh, nsw = nh * strh, nw * strw
-    # ============================================
+    # ================ img 2 col ================
     ss, shape = img.strides, (ci, w, h,  ni, nh, nw)
     strides  = (ss[-3], ss[-2]*dh, ss[-1]*dw, ss[-4], ss[-2]*strh, ss[-1]*strw)
     col_img = np.lib.stride_tricks.as_strided(img, shape=shape, strides=strides)
@@ -211,7 +210,8 @@ def grid_slice(H, W, h, w, mar):
     a, b = make_slice(H, h, mar), make_slice(W, w, mar)
     return list(itertools.product(a, b))
 
-def resize(img, size):
+def resize(img, size, backend=None):
+    np = backend or np
     d, (h, w) = img.ndim, img.shape[:2]
     kh, kw = size[0]/h, size[1]/w
     slicer = -0.5+0.5/kh, h-0.5-0.5/kh, size[0]
@@ -228,7 +228,8 @@ def resize(img, size):
     buf = img[:,ca]*(1-cs) + img[:,cb]*cs
     return buf[ra,:]*(1-rs) + buf[rb,:]*rs
 
-def mapcoord(img, rs, cs, keeptp=True):
+def mapcoord(img, rs, cs, keeptp=True, backend=None):
+    np = backend or np
     d, (h, w) = img.ndim, img.shape[:2]
     np.clip(rs, 0, h-1, out=rs)
     np.clip(cs, 0, w-1, out=cs)
@@ -243,19 +244,19 @@ def mapcoord(img, rs, cs, keeptp=True):
     buf += img[rb,ca] * ((1-cs) * rs)
     return buf.astype(img.dtype) if keeptp else buf
 
-# sample：缩放，数字代表比例，tuple代表尺寸
-# glob：感受野，当缩放后尺寸不足window时，将图像调整为glob整数倍
-# window：瓦片尺寸，当缩放后图像大于window，则进行分块处理
-# margin：瓦片之间的重叠区域，整数代表宽度，小数代表占瓦片的比例
+# sample：float or tuple, float means factor tuple means size
+# glob：force adjust image to glob's integral multiple.
+# window：after sample, if larger than window, then tiled by window
+# margin：overlay between window, float means factor and int means width
 def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=print):
     def wrapf(f):
         def wrap(*p, **key):
-            (h, w), img = p[0].shape[:2], p[0]
-            img = np.asarray(img, dtype=astype)
+            (h, w), ori_img = p[0].shape[:2], p[0]
+            samecore = isinstance(ori_img, np.ndarray)
+            img = np.asarray(ori_img, dtype=astype)
             tps = {'sample', 'window', 'glob', 'margin', 'progress'}
             ftp = fp, tp = {}, {}
-            for i in key:
-                ftp[i in tps][i] = key[i]
+            for i in key: ftp[i in tps][i] = key[i]
             ssz = tp.get('sample', sample)
             wsz = wsh = wsw = tp.get('window', window)
             gsz = tp.get('glob', glob)
@@ -263,7 +264,7 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=p
             info = tp.get('progress', progress)
             if isinstance(ssz, tuple): ssz = list(ssz)
             else: ssz = [int(h*ssz), int(w*ssz)]
-            # 如果尺寸不足瓦片尺寸，则连同瓦片缩放到glob整数倍
+            # smaller than window, then scale to glob
             from math import ceil
             if wsh>ssz[0]: wsh = ssz[0] = ceil(ssz[0]/gsz)*gsz
             if wsw>ssz[1]: wsw = ssz[1] = ceil(ssz[1]/gsz)*gsz
@@ -275,7 +276,7 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=p
             k = rst.shape[0]/(rcs[0][0].stop - rcs[0][0].start)
             if len(rcs)==1 and ssz!=[h, w]:
                 rst = resize(rst, (int(h*k), int(w*k)))
-            if len(rcs)==1: return rst
+            if len(rcs)==1: return rst if samecore else rst.get()
             def sk(ss, k):
                 sr = slice(int(ss[0].start*k), int(ss[0].stop*k))
                 sc = slice(int(ss[1].start*k), int(ss[1].stop*k))
@@ -301,7 +302,8 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=p
             np.divide(buf, count, out=buf, casting='unsafe')
             if ssz!=[h, w]: 
                 buf = resize(buf, (int(h*k), int(w*k)))
-            return buf.astype(rst.dtype)
+            rst = buf.astype(rst.dtype)
+            return rst if samecore else rst.get()
         return wrap
     return wrapf
 
