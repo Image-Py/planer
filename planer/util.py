@@ -211,17 +211,17 @@ def grid_slice(H, W, h, w, mar):
     return list(itertools.product(a, b))
 
 def resize(img, size, backend=None):
-    np = backend or np
+    nn = backend or np
     d, (h, w) = img.ndim, img.shape[:2]
     kh, kw = size[0]/h, size[1]/w
     slicer = -0.5+0.5/kh, h-0.5-0.5/kh, size[0]
-    rs = np.linspace(*slicer, dtype=np.float32)
+    rs = nn.linspace(*slicer, dtype=nn.float32)
     slicec = -0.5+0.5/kw, w-0.5-0.5/kw, size[1]
-    cs = np.linspace(*slicec, dtype=np.float32)
-    np.clip(rs, 0, h-1, out=rs)
-    np.clip(cs, 0, w-1, out=cs)
-    ra = np.floor(np.clip(rs, 0, h-1.5))
-    ca = np.floor(np.clip(cs, 0, w-1.5))
+    cs = nn.linspace(*slicec, dtype=nn.float32)
+    nn.clip(rs, 0, h-1, out=rs)
+    nn.clip(cs, 0, w-1, out=cs)
+    ra = nn.floor(nn.clip(rs, 0, h-1.5))
+    ca = nn.floor(nn.clip(cs, 0, w-1.5))
     ra, ca = ra.astype(int), ca.astype(int)
     rs -= ra; cs -= ca; rb = ra+1; cb = ca+1;
     rs.shape, cs.shape = (-1,1,1)[:d], (1,-1,1)[:d]
@@ -229,12 +229,12 @@ def resize(img, size, backend=None):
     return buf[ra,:]*(1-rs) + buf[rb,:]*rs
 
 def mapcoord(img, rs, cs, keeptp=True, backend=None):
-    np = backend or np
+    nn = backend or np
     d, (h, w) = img.ndim, img.shape[:2]
-    np.clip(rs, 0, h-1, out=rs)
-    np.clip(cs, 0, w-1, out=cs)
-    ra = np.floor(np.clip(rs, 0, h-1.5))
-    ca = np.floor(np.clip(cs, 0, w-1.5))
+    nn.clip(rs, 0, h-1, out=rs)
+    nn.clip(cs, 0, w-1, out=cs)
+    ra = nn.floor(nn.clip(rs, 0, h-1.5))
+    ca = nn.floor(nn.clip(cs, 0, w-1.5))
     ra, ca = ra.astype(int), ca.astype(int)
     rs -= ra; cs -= ca; rb = ra+1; cb = ca+1;
     if d==3: rs, cs = rs[:,:,None], cs[:,:,None]

@@ -17,11 +17,19 @@ def Dense(x, K, B, shp=None):
     y += B.reshape((1, -1))
     return y
 
-def Conv2d(x, K, B=None, shp=None, group=(1,1), strides=(1,1), dilation=(1,1), pads=(1,1,1,1)):
-    if np is numpy: out = conv_for(x, K, group, pads, strides, dilation)
-    elif not dnn is None: return conv_dnn(x, K, B, group, pads, strides, dilation)
-    else: out = conv_stride(x, K, group, pads, strides, dilation)
+def Conv2d(x, K, B=None, group=1, strides=(1,1), dilations=(1,1), pads=(0,0,0,0)):
+    if np is numpy: out = conv_for(x, K, group, pads, strides, dilations)
+    elif not dnn is None: return conv_dnn(x, K, B, group, pads, strides, dilations)
+    else: out = conv_stride(x, K, group, pads, strides, dilations)
     return out if B is None else np.add(out, B.reshape(1, -1, 1, 1), out=out)
+
+def ConvTranspose2d(x, K, B=None, strides=[2,2], dilations=[1,1], pads=[0,0,0,0], output_padding=[0,0], group=1):
+    (n, c, h, w), (s1, s2), (d1, d2), (H, W) = x.shape, strides, dilations, K.shape[2:]
+    low_h, high_h = ((H-1)*d1- pads[0]), ((H-1)*d1-pads[2]+output_padding[0])
+    low_w, high_w = ((W-1)*d2- pads[1]), ((W-1)*d2-pads[3]+output_padding[1])
+    buf = np.zeros((n, c, (h-1)*s1+low_h+high_h+1, (w-1)*s2+low_w+high_w+1), dtype=x.dtype)
+    buf[:,:,low_h:buf.shape[2]-high_h:s1,low_w:buf.shape[3]-high_w:s2] = x
+    return Conv2d(buf, K.transpose(1,0,2,3)[:,:,::-1,::-1], B, strides=[1,1], dilations=dilations, group=group)
 
 def ReLU(x): 
     if ep: return ep.evaluate('x * (x > 0)')
@@ -165,12 +173,19 @@ def Scatternd(data, indices, updates):
 def InstanceNormalization(x, s, bias, epsilon=1e-5):
     axis = tuple(range(2, x.ndim))
     mean = np.mean(x, axis=axis, keepdims=True)
-    var = np.var(x, axis=axis, keepdims=True)
+    var = x - mean; var **= 2; 
+    var = np.mean(var, axis=axis, keepdims=True)
     shapes = (-1,) + (1,) * (x.ndim - 2)
     s.shape = bias.shape = shapes
-    s = s / np.sqrt(var + epsilon)
-    x = x - mean; x *= s; x += bias
+    var = (var + epsilon) ** 0.5
+    x *= s/var; x += bias - s*mean/var
     return x
+
+def Pad(x, pads, constant_value=0, mode='constant'):
+    pads = pads.reshape(2,-1).T.tolist()
+    para = {'mode': mode}; 
+    if mode=='constant': para['constant_values'] = constant_value
+    return np.pad(x, pads, **para)
 
 def Clip(x, min=0, max=1): 
     return np.clip(x, min, max, out=x)
@@ -182,7 +197,7 @@ layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU,
              'flatten': Flatten, 'sigmoid': Sigmoid, 'softmax': Softmax, 
              'maxpool': Maxpool, 'avgpool': Avgpool, 'const': Const,
              'upsample': UpSample, 'concat': Concatenate, 'add': Add, 
-             'resize': Resize,
+             'resize': Resize, 'pad': Pad, 'convtranspose':ConvTranspose2d,
              'sub': Sub, 'reducemean': ReduceMean, 'exp': Exp, 'log': Log,
              'mul': Mul, 'gap': GlobalAveragePool, 'pow':Pow,
              'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 

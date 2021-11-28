@@ -36,7 +36,7 @@ def read_net(path, debug=False):
 types = [None, 'float32', 'uint8', 'int8', 'uint16', 'int16', 'int32', 'int64', 
     'str', 'bool', 'float16', 'float64', 'uint32', 'uint64', 'complex64', 'complex128']
 
-def node(attrs, name, k=None): 
+def node(attrs, name, k=None, para=None): 
     node = None
     for i in attrs: 
         if i.name==name: node = i
@@ -44,6 +44,9 @@ def node(attrs, name, k=None):
         return node
     rst = getattr(node, k)
     if k=='ints': rst = list(rst)
+    if k=='s': rst = rst.decode()
+    if not para is None: 
+        para[name] = rst
     return rst
 
 
@@ -69,7 +72,7 @@ def read_onnx(path):
 
         flows.append([inpara, [i.name], outpara])
         # weights.extend([values[i] for i in initpara])
-
+        # print(i.op_type, '===')
         if i.op_type == 'BatchNormalization':
             cur = flows[-1]
             k, b, m, v = [weights[values[cur[0][j]][0]] for j in (1,2,3,4)]
@@ -92,8 +95,17 @@ def read_onnx(path):
             d = node(attr, 'dilations', 'ints')
             p = node(attr, 'pads', 'ints')
             s = node(attr, 'strides', 'ints')
-            layers.append([i.name, 'conv', {'shp':[w[1], w[0], w[2], w[3]], 
-                'group':g, 'strides':s, 'dilation':d, 'pads':p}])
+            layers.append([i.name, 'conv', {
+                'group':g, 'strides':s, 'dilations':d, 'pads':p}])
+        elif i.op_type == 'ConvTranspose':
+            attr, w = i.attribute, values[i.input[1]][1]
+            para = {}
+            g = node(attr, 'group', 'i', para)
+            d = node(attr, 'dilations', 'ints', para)
+            p = node(attr, 'pads', 'ints', para)
+            s = node(attr, 'strides', 'ints', para)
+            op = node(attr, 'output_padding', 'ints', para)
+            layers.append([i.name, 'convtranspose', para])
         elif i.op_type == 'Gemm':
             layers.append([i.name, 'dense', {'shp':list(values[i.input[1]][1][::-1])}])
         elif i.op_type == 'MaxPool':
@@ -150,11 +162,14 @@ def read_onnx(path):
         elif i.op_type == 'Concat':
             layers.append([i.name, 'concat', {'axis':i.attribute[0].i}])
         elif i.op_type == 'Pad':
-            layers.append([i.name, 'identity', {}])
+            para = {}
+            node(i.attribute, 'mode', 's', para)
+            node(i.attribute, 'constant_value', 'f', para)
+            layers.append([i.name, 'pad', para])
         elif i.op_type == 'Sigmoid':
             layers.append([i.name, 'sigmoid', {}])
         elif i.op_type == 'AveragePool':
-            return i
+            return 'lost', i
             print('AveragePool IO, need review')
             for attr in i.attribute:
                 if 'stride' in attr.name: s = attr.ints[0]
