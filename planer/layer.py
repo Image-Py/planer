@@ -95,7 +95,9 @@ def BatchNorm(x, K, B):
     if ep: return ep.evaluate('x * K + B')
     x = x * K; x += B; return x
 
-def Unsqueeze(x, axis=None): return np.expand_dims(x, tuple(axis))
+def Unsqueeze(x, axis=None): 
+    axis = np.array(axis).tolist()
+    return np.expand_dims(x, tuple(axis))
 
 def Mul(x1, x2): 
     if ep: return ep.evaluate('x1 * x2')
@@ -158,7 +160,7 @@ def Expand(x, shp):
 def Cast(x, dtype='flaot32'): return x.astype(dtype)
 
 def Range(start, end, delta): 
-    return np.arange(start, end, delta)
+    return np.arange(int(start), int(end), int(delta))
 
 def Equal(x1, x2): return np.equal(x1, x2)
 

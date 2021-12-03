@@ -42,14 +42,14 @@ class Net:
             for l in ls:
                 out = x if l == ls[0] else y
                 if not isinstance(out, str):
-                    p = [rst[i] for i in out]
+                    p = [rst.get(i) for i in out]
                 else: p = [rst[out]]
                 xs = x if isinstance(x, list) else [x]
                 for k in set(xs): # release wasted obj
-                    if self.life[k]<=i: del rst[k]
+                    if k in rst and self.life[k]<=i: del rst[k]
                 obj = dic[l]
                 start = time()
-                if debug: 
+                if debug:
                     print(l, obj.name, ':', obj.para())
                     outp = out #[(i, 'Weights')[i in self.inits] for i in out]
                     print('\t--> ', outp, ':', self.info(p))
@@ -59,6 +59,7 @@ class Net:
                 if debug: 
                     for k in (y, [y])[isinstance(y, str)]:
                         print('\t<-- ',  k, ':', self.info(rst[k]))
+                # np.cuda.runtime.deviceSynchronize()
                 cost = time()-start
                 if not obj.name in self.timer:
                     self.timer[obj.name] = 0
@@ -78,8 +79,8 @@ class Net:
     def load_weights(self, data):
         s, data = 0, data.view(dtype=np.uint8)
         for i in range(len(self.weights)):
-            buf = self.weights[i].view(dtype=np.uint8)
-            buf.ravel()[:] = data[s:s+buf.size]
+            buf = self.weights[i].ravel().view(dtype=np.uint8)
+            buf[:] = data[s:s+buf.size]
             s += buf.size
                 
     def show(self):

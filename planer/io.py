@@ -57,9 +57,9 @@ def read_onnx(path):
     layers, inits, weights, flows, values = [], [], [], [], {}
     for i in graph.initializer: 
         v = onnx.numpy_helper.to_array(i)
-        if v.ndim==0: v = np.array([v])
         values[i.name] = len(weights), v.shape
         inits.append([i.name, v.shape, str(v.dtype)])
+        if v.ndim==0: v = np.array([v])
         weights.append(v)
     for i in graph.node:
         inpara = [j for j in i.input]
@@ -116,12 +116,12 @@ def read_onnx(path):
         elif i.op_type == 'GlobalAveragePool':
             layers.append([i.name, 'gap', {}])
         elif i.op_type == 'Upsample':
-            mode = i.attribute[0].s.decode()
+            mode = node(i.attribute, 'mode', 's')
             layers.append([i.name, 'upsample', {'mode':mode}])
         elif i.op_type == 'Resize':
-            mode = node(i.attribute, 'mode', 's').decode()
-            nearest_mode = node(i.attribute, 'nearest_mode', 's').decode()
-            trans_mode = node(i.attribute, 'coordinate_transformation_mode', 's').decode()
+            mode = node(i.attribute, 'mode', 's')
+            nearest_mode = node(i.attribute, 'nearest_mode', 's')
+            trans_mode = node(i.attribute, 'coordinate_transformation_mode', 's')
             layers.append([i.name, 'resize', {'mode':mode, 'nearest_mode':nearest_mode, 
                 'coordinate_transformation_mode': trans_mode}])
         elif i.op_type == 'Flatten':
@@ -141,7 +141,6 @@ def read_onnx(path):
         elif i.op_type == 'Div':
             layers.append([i.name, 'div', {}])
         elif i.op_type == 'Constant':
-            # print(i.name, i.output[0])
             dim = i.attribute[0].t.dims
 
             buf = i.attribute[0].t.raw_data
