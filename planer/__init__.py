@@ -63,31 +63,30 @@ def download(url, path, info=print, progress=progress):
     f, rst = urllib.request.urlretrieve(url, path,
         lambda a,b,c: progress(int(100.0 * a * b/c), 100))
 
-def downloads(model, names='required', force=False, info=print, progress=progress):
-    lst = model.source()
+def source(root, lst):
+    for i in lst:
+        if len(i)==3: i.insert(2, False)
+        i[2] = os.path.exists(root + '/' + i[0])
+    return lst
+
+def list_source(root, lst):
+    print('%-20s%-10s%-10s\n'%('file name','required', 'installed')+'-'*40)
+    for i in source(root, lst):print('%-20s%-10s%-10s'%(tuple(i[:3])))
+
+def downloads(root, lst, names='required', force=False, info=print, progress=progress):
+    source(root, lst)
     if names=='all': lst = [i for i in lst]
     elif names=='required': lst = [i for i in lst if i[1]]
     else:
         if isinstance(names, str): names = [names]
         lst = [i for i in lst if i[0] in names]
     if not force: lst = [i for i in lst if not i[2]]
-    name = model.__name__.replace('planer_zoo.', '')
-    path = root +'/' +  '/'.join(name.split('.'))
-    if not os.path.exists(path): os.makedirs(path)
+    # name = model.__name__.replace('planer_zoo.', '')
+    if not os.path.exists(root): os.makedirs(root)
     for name, a, b, url in lst:
-        download(url, path+'/'+name, info, progress)
+        download(url, root+'/'+name, info, progress)
 
-def list_source(model):
-    print('%-20s%-10s%-10s\n'%('file name','required', 'installed')+'-'*40)
-    for i in model.source():print('%-20s%-10s%-10s'%(tuple(i[:3])))
-
-def source(root, lst):
-    for i in lst:
-        if len(i)==3: i.insert(2, False)
-        i[2] = os.path.exists(root + '/' + i[0])
-    return lst
-    
-# name, need, has, url
+# parse source from a markdown file
 def get_source(path):
     with open(path) as f: cont = f.read().split('\n')
     status, files = False, []
@@ -116,9 +115,9 @@ def Model(model, auto=True):
     ms = [getattr(model, i) for i in dir(model)]
     for m in set([inspect.getmodule(i) for i in ms]):
         if hasattr(m, 'root') and m.root == oroot: m.root = mroot
-    model.list_source = lambda x=model: list_source(x)
-    name = '/'.join(model.__package__.split('.')[1:])
+    model.list_source = lambda root=mroot, lst=model.source(): list_source(root, lst)
     model.download = lambda name='required', force=False, info=print, \
-    	progress=progress, m=model: downloads(m, name, force)
+    	progress=progress, m=mroot: downloads(
+    		m, model.source(), name, force, info, progress)
     if auto: [model.download(), model.load()]
     return model
