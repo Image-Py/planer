@@ -44,7 +44,7 @@ def asnumpy(arr, **key): return np.asnumpy(arr, **key)
 def asarray(arr, **key): return np.asarray(arr, **key)
 
 # ========== planer zoo ==========
-import inspect
+import inspect, importlib
 import urllib.request
 
 root = os.path.expandvars('$HOME')+'/.planer_zoo'
@@ -121,3 +121,7 @@ def Model(model, auto=True):
     		m, model.source(), name, force, info, progress)
     if auto: [model.download(), model.load()]
     return model
+
+def load(name, auto=True):
+	model = importlib.import_module(name)
+	return Model(model, auto)
