@@ -128,12 +128,20 @@ def read_onnx(path):
             layers.append([i.name, 'flatten', {}])
         elif i.op_type == 'Unsqueeze':
             axis = node(i.attribute, 'axes', 'ints')
-            layers.append([i.name, 'unsqueeze', {} if axis is None else {'axis':axis}])
+            layers.append([i.name, 'unsqueeze', {} if axis is None else {'axes':axis}])
+        elif i.op_type == 'Squeeze':
+            axis = node(i.attribute, 'axes', 'ints')
+            layers.append([i.name, 'squeeze', {} if axis is None else {'axes':axis}])
         elif i.op_type == 'Relu':
             layers.append([i.name, 'relu', {}])
         elif i.op_type == 'LeakyRelu':
             alpha = i.attribute[0].f
             layers.append([i.name, 'leakyrelu', {'alpha':alpha}])
+        elif i.op_type == 'HardSigmoid':
+            para = {}
+            node(i.attribute, 'alpha', 'f', para)
+            node(i.attribute, 'beta', 'f', para)
+            layers.append([i.name, 'hardsigmoid', para])
         elif i.op_type == 'Add':
             layers.append([i.name, 'add', {}])
         elif i.op_type == 'Sub':
@@ -168,12 +176,11 @@ def read_onnx(path):
         elif i.op_type == 'Sigmoid':
             layers.append([i.name, 'sigmoid', {}])
         elif i.op_type == 'AveragePool':
-            return 'lost', i
-            print('AveragePool IO, need review')
-            for attr in i.attribute:
-                if 'stride' in attr.name: s = attr.ints[0]
-                if 'kernel' in attr.name: w = attr.ints[0]
-            layers.append([i.name, 'avgpool', [w, s]])
+            w = node(i.attribute, 'kernel_shape', 'ints')
+            m = node(i.attribute, 'pads', 'ints')
+            s = node(i.attribute, 'strides', 'ints')
+            layers.append([i.name, 'averagepool', {'w':w, 'pads':m, 'strides':s}])
+
         elif i.op_type == 'Shape':
             layers.append([i.name, 'shape', {}])
         elif i.op_type == 'Gather':

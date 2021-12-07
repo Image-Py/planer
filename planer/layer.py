@@ -47,6 +47,10 @@ def Sigmoid(x):
     x = -x; np.exp(x, out=x); x += 1
     return np.divide(1, x, out=x)
 
+def HardSigmoid(x, alpha=0.2, beta=0.5):
+    x = x * alpha; x += beta
+    return np.clip(x, 0, 1, out=x)
+
 def Softmax(x, axis=-1):
     eX = np.exp((x.T - np.max(x, axis=self.axis)).T)
     return (eX.T / eX.sum(axis=self.axis)).T
@@ -54,7 +58,7 @@ def Softmax(x, axis=-1):
 def Maxpool(x, w=(2,2), pads=(0,0,0,0), strides=(2,2)):
     return maxpool(x, w, pads, strides)
 
-def Avgpool(x, w=(2,2), pads=(0,0,0,0), strides=(2,2)):
+def AveragePool(x, w=(2,2), pads=(0,0,0,0), strides=(2,2)):
     return avgpool(x, w, pads, strides)
 
 def GlobalAveragePool(x):
@@ -95,9 +99,12 @@ def BatchNorm(x, K, B):
     if ep: return ep.evaluate('x * K + B')
     x = x * K; x += B; return x
 
-def Unsqueeze(x, axis=None): 
-    axis = np.array(axis).tolist()
-    return np.expand_dims(x, tuple(axis))
+def Unsqueeze(x, axes=None): 
+    axis = np.array(axes).tolist()
+    return np.expand_dims(x, tuple(axes))
+
+def Squeeze(x, axes=[0]):
+    return np.squeeze(x, axis=axes[0])
 
 def Mul(x1, x2): 
     if ep: return ep.evaluate('x1 * x2')
@@ -197,7 +204,8 @@ def Return(*x): return x
 layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU, 
              'leakyrelu': LeakyReLU, 'batchnorm': BatchNorm,
              'flatten': Flatten, 'sigmoid': Sigmoid, 'softmax': Softmax, 
-             'maxpool': Maxpool, 'avgpool': Avgpool, 'const': Const,
+             'hardsigmoid': HardSigmoid, 'squeeze': Squeeze,
+             'maxpool': Maxpool, 'averagepool': AveragePool, 'const': Const,
              'upsample': UpSample, 'concat': Concatenate, 'add': Add, 
              'resize': Resize, 'pad': Pad, 'convtranspose':ConvTranspose2d,
              'sub': Sub, 'reducemean': ReduceMean, 'exp': Exp, 'log': Log,

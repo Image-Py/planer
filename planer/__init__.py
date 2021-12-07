@@ -44,10 +44,10 @@ def asnumpy(arr, **key): return np.asnumpy(arr, **key)
 def asarray(arr, **key): return np.asarray(arr, **key)
 
 # ========== planer zoo ==========
-import inspect, importlib
+import inspect, importlib, pathlib
 import urllib.request
 
-root = os.path.expandvars('$HOME')+'/.planer_zoo'
+root = str(pathlib.Path.home())+'/.planer_zoo'
 if not os.path.exists(root): os.mkdir(root)
 
 def progress(i, n, bar=[None]):
@@ -104,6 +104,7 @@ def get_source(path):
     return files
 
 def Model(model, auto=True):
+    if hasattr(model, 'list_source'): return model
     name = model.__name__.replace('planer_zoo.', '')
     md = model.__file__.replace('__init__.py', 'readme.py')[:-2]+'md'
     mroot = root +'/' +  '/'.join(name.split('.'))
