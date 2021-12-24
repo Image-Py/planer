@@ -40,6 +40,10 @@ def LeakyReLU(x, alpha=0.2):
     if ep: return ep.evaluate('x*((x>0)*b+a)')
     y = (x>0) * b; y += a; y *= x; return y
 
+def Identity(x): return x
+
+def Tile(x, repeat): return np.tile(x, repeat)
+
 def Flatten(x): return x.reshape((x.shape[0], -1))
 
 def Sigmoid(x):
@@ -77,13 +81,9 @@ def Resize(x, roi, k, size=None, mode='nearest',
 def Concatenate(*xs, axis=0):
     return np.concatenate(xs, axis=axis)
 
-def Add(x1, x2): 
-    if ep: return ep.evaluate('x1 + x2')
-    return x1 + x2
+def Add(x1, x2): return x1 + x2
 
-def Sub(x1, x2): 
-    if ep: return ep.evaluate('x1 - x2')
-    return x1 - x2
+def Sub(x1, x2): return x1 - x2
 
 def Pow(x, p): return np.power(x, p)
     
@@ -106,9 +106,7 @@ def Unsqueeze(x, axes=None):
 def Squeeze(x, axes=[0]):
     return np.squeeze(x, axis=axes[0])
 
-def Mul(x1, x2): 
-    if ep: return ep.evaluate('x1 * x2')
-    return x1 * x2
+def Mul(x1, x2): return x1 * x2
 
 def Const(value=0, dtype='float32'): 
     if isinstance(value, list):
@@ -197,7 +195,69 @@ def Pad(x, pads, constant_value=0, mode='constant'):
     return np.pad(x, pads, **para)
 
 def Clip(x, min=0, max=1): 
-    return np.clip(x, min, max, out=x)
+    '''
+    x = ep.evaluate('(x-minv) * (x>minv) + minv')
+    return ep.evaluate('(x-maxv) * (x<maxv) + maxv')
+    x -= min
+    x *= x>0
+    x += min - max
+    x *= x<0
+    x += max
+    return x
+    '''
+    x = np.minimum(x, max, out=x)
+    return np.maximum(x, min, out=x)
+
+    # return np.clip(x, min, max, out=x)
+
+def sigmoid(x): return 1/(1+np.exp(-x))
+
+def tanh(x): return np.tanh(x)
+
+def LSTM(X, W, R, B=0, sequence_lens=0, initial_h=0, initial_c=0, hidden_size=None):
+    L, N, input_dim = X.shape
+
+    Y = np.zeros((L, 1, N, hidden_size), dtype=np.float32)
+
+    Wi = W[0, 0*hidden_size:1*hidden_size]
+    Wo = W[0, 1*hidden_size:2*hidden_size]
+    Wf = W[0, 2*hidden_size:3*hidden_size]
+    Wc = W[0, 3*hidden_size:4*hidden_size]
+
+    Ri = R[0, 0*hidden_size:1*hidden_size]
+    Ro = R[0, 1*hidden_size:2*hidden_size]
+    Rf = R[0, 2*hidden_size:3*hidden_size]
+    Rc = R[0, 3*hidden_size:4*hidden_size]
+
+    Wbi = B[0, 0*hidden_size:1*hidden_size]
+    Wbo = B[0, 1*hidden_size:2*hidden_size]
+    Wbf = B[0, 2*hidden_size:3*hidden_size]
+    Wbc = B[0, 3*hidden_size:4*hidden_size]
+
+    Rbi = B[0, 4*hidden_size:5*hidden_size]
+    Rbo = B[0, 5*hidden_size:6*hidden_size]
+    Rbf = B[0, 6*hidden_size:7*hidden_size]
+    Rbc = B[0, 7*hidden_size:8*hidden_size]
+
+
+    H = initial_h
+    C = initial_c
+
+
+    for t in range(L):
+        Xt = X[t, :, :]
+        it = sigmoid(Xt.dot(Wi.T)) + H.dot(Ri.T) + Wbi + Rbi
+        ft = sigmoid(Xt.dot(Wf.T)) + H.dot(Rf.T) + Wbf + Rbf
+
+        ct = tanh(Xt.dot(Wc.T)) + H.dot(Rc.T) + Wbc + Rbc
+        C = ft*C + it*ct
+
+        ot = sigmoid(Xt.dot(Wo.T)) + H.dot(Ro.T) + Wbo + Rbo
+        H = ot*tanh(C)
+
+        Y[t, :, :, :] = H
+
+    return Y, H, C
 
 def Return(*x): return x
 
@@ -210,6 +270,7 @@ layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU,
              'resize': Resize, 'pad': Pad, 'convtranspose':ConvTranspose2d,
              'sub': Sub, 'reducemean': ReduceMean, 'exp': Exp, 'log': Log,
              'mul': Mul, 'gap': GlobalAveragePool, 'pow':Pow,
+             'identity' : Identity, 'tile': Tile, 'lstm':LSTM,
              'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 
              'shape': Shape, 'gather':Gather, 'reshape':Reshape,
              'split':Split, 'tanh':Tanh, 'constantofshape':ConstantofShape,

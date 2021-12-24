@@ -90,7 +90,8 @@ def read_onnx(path):
             cur[0] = [cur[0][0], kname, bname]
             layers.append([i.name, 'batchnorm', {}])
         elif i.op_type == 'Conv':
-            attr, w = i.attribute, values[i.input[1]][1]
+            # attr, w = i.attribute, values[i.input[1]][1]
+            attr = i.attribute
             g = node(attr, 'group', 'i') or 1
             d = node(attr, 'dilations', 'ints')
             p = node(attr, 'pads', 'ints')
@@ -98,7 +99,7 @@ def read_onnx(path):
             layers.append([i.name, 'conv', {
                 'group':g, 'strides':s, 'dilations':d, 'pads':p}])
         elif i.op_type == 'ConvTranspose':
-            attr, w = i.attribute, values[i.input[1]][1]
+            attr = i.attribute
             para = {}
             g = node(attr, 'group', 'i', para)
             d = node(attr, 'dilations', 'ints', para)
@@ -148,14 +149,23 @@ def read_onnx(path):
             layers.append([i.name, 'sub', {}])
         elif i.op_type == 'Div':
             layers.append([i.name, 'div', {}])
+        elif i.op_type == 'Tile':
+            layers.append([i.name, 'tile', {}])
+        elif i.op_type == 'MatMul':
+            pass
         elif i.op_type == 'Constant':
+            _, _, name = flows.pop(-1)
             dim = i.attribute[0].t.dims
-
-            buf = i.attribute[0].t.raw_data
             tp = types[i.attribute[0].t.data_type]
-            # if len(buf)==0: continue
-            v = numpy.frombuffer(buf, tp).reshape(dim).tolist()
-            layers.append([i.name, 'const', {'value':v, 'dtype':tp}])
+
+            v = onnx.numpy_helper.to_array(i.attribute[0].t)
+            values[name] = len(weights), v.shape
+            inits.append([name, v.shape, str(v.dtype)])
+            if v.ndim==0: v = np.array([v])
+            weights.append(v)
+            #layers.append([i.name, 'const', {'value':v, 'dtype':tp}])
+        elif i.op_type == 'Identity':
+            layers.append([i.name, 'identity', {}])
         elif i.op_type == 'Pow':
             layers.append([i.name, 'pow', {}])
         elif i.op_type == 'ReduceSum':
@@ -180,7 +190,8 @@ def read_onnx(path):
             m = node(i.attribute, 'pads', 'ints')
             s = node(i.attribute, 'strides', 'ints')
             layers.append([i.name, 'averagepool', {'w':w, 'pads':m, 'strides':s}])
-
+        elif i.op_type == 'LSTM':
+            layers.append([i.name, 'lstm', {'hidden_size': i.attribute[0].i}])
         elif i.op_type == 'Shape':
             layers.append([i.name, 'shape', {}])
         elif i.op_type == 'Gather':
@@ -193,6 +204,8 @@ def read_onnx(path):
             layers.append([i.name, 'transpose', {'axis':node(i.attribute, 'perm', 'ints')}])
         elif i.op_type == 'LogSoftmax':
             layers.append([i.name, 'logsoftmax', {'axis':i.attribute[0].i}])
+        elif i.op_type == 'Softmax':
+            layers.append([i.name, 'softmax', {'axis':i.attribute[0].i}])
         elif i.op_type == 'ConstantOfShape': 
             dim = i.attribute[0].t.dims
             buf = i.attribute[0].t.raw_data
