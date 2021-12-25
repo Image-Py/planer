@@ -17,6 +17,8 @@ def Dense(x, K, B, shp=None):
     y += B.reshape((1, -1))
     return y
 
+def MatMul(x, y): return np.dot(x, y)
+
 def Conv2d(x, K, B=None, group=1, strides=(1,1), dilations=(1,1), pads=(0,0,0,0)):
     if np is numpy: out = conv_for(x, K, group, pads, strides, dilations)
     elif not dnn is None: return conv_dnn(x, K, B, group, pads, strides, dilations)
@@ -56,8 +58,9 @@ def HardSigmoid(x, alpha=0.2, beta=0.5):
     return np.clip(x, 0, 1, out=x)
 
 def Softmax(x, axis=-1):
-    eX = np.exp((x.T - np.max(x, axis=self.axis)).T)
-    return (eX.T / eX.sum(axis=self.axis)).T
+    x = np.exp(x)
+    x /= x.sum(axis=axis, keepdims=1)
+    return x
 
 def Maxpool(x, w=(2,2), pads=(0,0,0,0), strides=(2,2)):
     return maxpool(x, w, pads, strides)
@@ -210,54 +213,93 @@ def Clip(x, min=0, max=1):
 
     # return np.clip(x, min, max, out=x)
 
-def sigmoid(x): return 1/(1+np.exp(-x))
-
-def tanh(x): return np.tanh(x)
-
-def LSTM(X, W, R, B=0, sequence_lens=0, initial_h=0, initial_c=0, hidden_size=None):
+def LSTM(X, W, R, B=0, sequence_lens=0, initial_h=0, initial_c=0, hidden_size=None, direction='forward'):
     L, N, input_dim = X.shape
+    hidden_size = R.shape[-1]
+    
+    if direction == 'forward':
+        Y = np.zeros((L, 1, N, hidden_size), dtype=np.float32)
 
-    Y = np.zeros((L, 1, N, hidden_size), dtype=np.float32)
+        W = np.squeeze(W, axis=0)
+        R = np.squeeze(R, axis=0)
+        B = np.squeeze(B, axis=0)
 
-    Wi = W[0, 0*hidden_size:1*hidden_size]
-    Wo = W[0, 1*hidden_size:2*hidden_size]
-    Wf = W[0, 2*hidden_size:3*hidden_size]
-    Wc = W[0, 3*hidden_size:4*hidden_size]
+        H_t = initial_h
+        C_t = initial_c
 
-    Ri = R[0, 0*hidden_size:1*hidden_size]
-    Ro = R[0, 1*hidden_size:2*hidden_size]
-    Rf = R[0, 2*hidden_size:3*hidden_size]
-    Rc = R[0, 3*hidden_size:4*hidden_size]
+        for t, x in enumerate(np.split(X, X.shape[0], axis=0)):
+                gates = np.dot(x, np.transpose(W)) + np.dot(H_t, np.transpose(R)) + np.add(
+                    *np.split(B, 2))
+                i, o, f, c = np.split(gates, 4, -1)
+                i = Sigmoid(i + 0 * C_t)
+                f = Sigmoid(f + 0 * C_t)
+                c = Tanh(c)
+                C = f * C_t + i * c
+                o = Sigmoid(o + 0 * C)
+                H = o * Tanh(C)
+                H_t = H
+                C_t = C
+                Y[t, :, :, :] = H
 
-    Wbi = B[0, 0*hidden_size:1*hidden_size]
-    Wbo = B[0, 1*hidden_size:2*hidden_size]
-    Wbf = B[0, 2*hidden_size:3*hidden_size]
-    Wbc = B[0, 3*hidden_size:4*hidden_size]
+        return Y, H, C
+    else:
+        Y = np.zeros((L, 2, N, hidden_size), dtype=np.float32)
 
-    Rbi = B[0, 4*hidden_size:5*hidden_size]
-    Rbo = B[0, 5*hidden_size:6*hidden_size]
-    Rbf = B[0, 6*hidden_size:7*hidden_size]
-    Rbc = B[0, 7*hidden_size:8*hidden_size]
+        W1 = W[0, :]
+        R1 = R[0, :]
+        B1 = B[0, :]
 
+        Hb = np.zeros_like(initial_h).astype('float32')
+        Cb = np.zeros_like(initial_h).astype('float32')
 
-    H = initial_h
-    C = initial_c
+        H_t = initial_h[0, :, :]
+        C_t = initial_c[0, :, :]
+        for t, x in enumerate(np.split(X, X.shape[0], axis=0)):
+            gates = np.dot(x, np.transpose(W1)) + np.dot(H_t, np.transpose(R1)) + np.add(
+                *np.split(B1, 2))
+            i, o, f, c = np.split(gates, 4, -1)
+            i = Sigmoid(i + 0 * C_t)
+            f = Sigmoid(f + 0 * C_t)
+            c = Tanh(c)
+            C = f * C_t + i * c
+            o = Sigmoid(o + 0 * C)
+            H = o * Tanh(C)
+            H_t = H
+            C_t = C
+            Y[t, 0, :, :] = H
 
+        Hb[0, :, :] = H
+        Cb[0, :, :] = C
 
-    for t in range(L):
-        Xt = X[t, :, :]
-        it = sigmoid(Xt.dot(Wi.T)) + H.dot(Ri.T) + Wbi + Rbi
-        ft = sigmoid(Xt.dot(Wf.T)) + H.dot(Rf.T) + Wbf + Rbf
+           
+        W2 = W[1, :]
+        R2 = R[1, :]
+        B2 = B[1, :]
 
-        ct = tanh(Xt.dot(Wc.T)) + H.dot(Rc.T) + Wbc + Rbc
-        C = ft*C + it*ct
+        # print(W2.shape, R2.shape)
 
-        ot = sigmoid(Xt.dot(Wo.T)) + H.dot(Ro.T) + Wbo + Rbo
-        H = ot*tanh(C)
+        H_t = initial_h[1, :, :]
+        C_t = initial_c[1, :, :]  
 
-        Y[t, :, :, :] = H
+        X = X[::-1, :, :]
+        for t, x in enumerate(np.split(X, X.shape[0], axis=0)):
+            gates = np.dot(x, np.transpose(W2)) + np.dot(H_t, np.transpose(R2)) + np.add(
+                *np.split(B2, 2))
+            i, o, f, c = np.split(gates, 4, -1)
+            i = Sigmoid(i + 0 * C_t)
+            f = Sigmoid(f + 0 * C_t)
+            c = Tanh(c)
+            C = f * C_t + i * c
+            o = Sigmoid(o + 0 * C)
+            H = o * Tanh(C)
+            H_t = H
+            C_t = C
+            Y[L-1-t, 1, :, :] = H
 
-    return Y, H, C
+        Hb[1, :, :] = H
+        Cb[1, :, :] = C
+
+        return Y, H, C
 
 def Return(*x): return x
 
@@ -269,7 +311,7 @@ layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU,
              'upsample': UpSample, 'concat': Concatenate, 'add': Add, 
              'resize': Resize, 'pad': Pad, 'convtranspose':ConvTranspose2d,
              'sub': Sub, 'reducemean': ReduceMean, 'exp': Exp, 'log': Log,
-             'mul': Mul, 'gap': GlobalAveragePool, 'pow':Pow,
+             'mul': Mul, 'gap': GlobalAveragePool, 'pow':Pow, 'matmul': MatMul,
              'identity' : Identity, 'tile': Tile, 'lstm':LSTM,
              'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 
              'shape': Shape, 'gather':Gather, 'reshape':Reshape,

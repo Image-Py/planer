@@ -152,7 +152,7 @@ def read_onnx(path):
         elif i.op_type == 'Tile':
             layers.append([i.name, 'tile', {}])
         elif i.op_type == 'MatMul':
-            pass
+            layers.append([i.name, 'matmul', {}])
         elif i.op_type == 'Constant':
             _, _, name = flows.pop(-1)
             dim = i.attribute[0].t.dims
@@ -191,7 +191,9 @@ def read_onnx(path):
             s = node(i.attribute, 'strides', 'ints')
             layers.append([i.name, 'averagepool', {'w':w, 'pads':m, 'strides':s}])
         elif i.op_type == 'LSTM':
-            layers.append([i.name, 'lstm', {'hidden_size': i.attribute[0].i}])
+            para = {'hidden_size': i.attribute[0].i}
+            node(i.attribute, 'direction', 's', para)
+            layers.append([i.name, 'lstm', para])
         elif i.op_type == 'Shape':
             layers.append([i.name, 'shape', {}])
         elif i.op_type == 'Gather':
