@@ -1,4 +1,4 @@
-from .util import maxpool, upsample, avgpool, np
+from .util import maxpool, upsample, avgpool, np, lstm
 from .util import conv_for, conv_stride, conv_dnn
 ep, dnn = None, None # numexpr is help for numpy backend
 import numpy
@@ -17,7 +17,7 @@ def Dense(x, K, B, shp=None):
     y += B.reshape((1, -1))
     return y
 
-def MatMul(x, y): return np.dot(x, y)
+def MatMul(x, y): return x @ y
 
 def Conv2d(x, K, B=None, group=1, strides=(1,1), dilations=(1,1), pads=(0,0,0,0)):
     if np is numpy: out = conv_for(x, K, group, pads, strides, dilations)
@@ -32,6 +32,14 @@ def ConvTranspose2d(x, K, B=None, strides=[2,2], dilations=[1,1], pads=[0,0,0,0]
     buf = np.zeros((n, c, (h-1)*s1+low_h+high_h+1, (w-1)*s2+low_w+high_w+1), dtype=x.dtype)
     buf[:,:,low_h:buf.shape[2]-high_h:s1,low_w:buf.shape[3]-high_w:s2] = x
     return Conv2d(buf, K.transpose(1,0,2,3)[:,:,::-1,::-1], B, strides=[1,1], dilations=dilations, group=group)
+
+def LSTM(X, W, R, B=0, sequence_lens=0, initial_h=0, initial_c=0, hidden_size=None, direction='forward'):
+    dirs = {'forward':[1], 'reverse':[-1], 'bidirectional':[1,-1]}
+    (L, N, input_dim), hidden_size = X.shape, R.shape[-1]
+    Y = np.zeros((L, len(dirs[direction]), N, hidden_size), dtype=np.float32)
+    for i, d in enumerate(dirs[direction]):
+        _, H, C = lstm(X, Y[:,i], W[i], R[i], B[i], initial_h[i], initial_c[i], d)
+    return Y, H, C
 
 def ReLU(x): 
     if ep: return ep.evaluate('x * (x > 0)')
@@ -55,7 +63,8 @@ def Sigmoid(x):
 
 def HardSigmoid(x, alpha=0.2, beta=0.5):
     x = x * alpha; x += beta
-    return np.clip(x, 0, 1, out=x)
+    x = np.minimum(x, 1, out=x)
+    return np.maximum(x, 0, out=x)
 
 def Softmax(x, axis=-1):
     x = np.exp(x)
@@ -84,13 +93,19 @@ def Resize(x, roi, k, size=None, mode='nearest',
 def Concatenate(*xs, axis=0):
     return np.concatenate(xs, axis=axis)
 
-def Add(x1, x2): return x1 + x2
+def Add(x1, x2): 
+    if ep: return ep.evaluate('x1 + x2')
+    return x1 + x2
 
-def Sub(x1, x2): return x1 - x2
+def Sub(x1, x2): 
+    if ep: return ep.evaluate('x1 - x2')
+    return x1 - x2
 
 def Pow(x, p): return np.power(x, p)
     
-def Div(x1, x2): return x1 / x2
+def Div(x1, x2): 
+    if ep: return ep.evaluate('x1 / x2')
+    return x1 / x2
 
 def ReduceSum(x, axis=-1, keepdims=False):
     return x.sum(axis=tuple(axis), keepdims=keepdims)
@@ -109,7 +124,9 @@ def Unsqueeze(x, axes=None):
 def Squeeze(x, axes=[0]):
     return np.squeeze(x, axis=axes[0])
 
-def Mul(x1, x2): return x1 * x2
+def Mul(x1, x2): 
+    if ep: return ep.evaluate('x1 * x2')
+    return x1 * x2
 
 def Const(value=0, dtype='float32'): 
     if isinstance(value, list):
@@ -198,108 +215,8 @@ def Pad(x, pads, constant_value=0, mode='constant'):
     return np.pad(x, pads, **para)
 
 def Clip(x, min=0, max=1): 
-    '''
-    x = ep.evaluate('(x-minv) * (x>minv) + minv')
-    return ep.evaluate('(x-maxv) * (x<maxv) + maxv')
-    x -= min
-    x *= x>0
-    x += min - max
-    x *= x<0
-    x += max
-    return x
-    '''
     x = np.minimum(x, max, out=x)
     return np.maximum(x, min, out=x)
-
-    # return np.clip(x, min, max, out=x)
-
-def LSTM(X, W, R, B=0, sequence_lens=0, initial_h=0, initial_c=0, hidden_size=None, direction='forward'):
-    L, N, input_dim = X.shape
-    hidden_size = R.shape[-1]
-    
-    if direction == 'forward':
-        Y = np.zeros((L, 1, N, hidden_size), dtype=np.float32)
-
-        W = np.squeeze(W, axis=0)
-        R = np.squeeze(R, axis=0)
-        B = np.squeeze(B, axis=0)
-
-        H_t = initial_h
-        C_t = initial_c
-
-        for t, x in enumerate(np.split(X, X.shape[0], axis=0)):
-                gates = np.dot(x, np.transpose(W)) + np.dot(H_t, np.transpose(R)) + np.add(
-                    *np.split(B, 2))
-                i, o, f, c = np.split(gates, 4, -1)
-                i = Sigmoid(i + 0 * C_t)
-                f = Sigmoid(f + 0 * C_t)
-                c = Tanh(c)
-                C = f * C_t + i * c
-                o = Sigmoid(o + 0 * C)
-                H = o * Tanh(C)
-                H_t = H
-                C_t = C
-                Y[t, :, :, :] = H
-
-        return Y, H, C
-    else:
-        Y = np.zeros((L, 2, N, hidden_size), dtype=np.float32)
-
-        W1 = W[0, :]
-        R1 = R[0, :]
-        B1 = B[0, :]
-
-        Hb = np.zeros_like(initial_h).astype('float32')
-        Cb = np.zeros_like(initial_h).astype('float32')
-
-        H_t = initial_h[0, :, :]
-        C_t = initial_c[0, :, :]
-        for t, x in enumerate(np.split(X, X.shape[0], axis=0)):
-            gates = np.dot(x, np.transpose(W1)) + np.dot(H_t, np.transpose(R1)) + np.add(
-                *np.split(B1, 2))
-            i, o, f, c = np.split(gates, 4, -1)
-            i = Sigmoid(i + 0 * C_t)
-            f = Sigmoid(f + 0 * C_t)
-            c = Tanh(c)
-            C = f * C_t + i * c
-            o = Sigmoid(o + 0 * C)
-            H = o * Tanh(C)
-            H_t = H
-            C_t = C
-            Y[t, 0, :, :] = H
-
-        Hb[0, :, :] = H
-        Cb[0, :, :] = C
-
-           
-        W2 = W[1, :]
-        R2 = R[1, :]
-        B2 = B[1, :]
-
-        # print(W2.shape, R2.shape)
-
-        H_t = initial_h[1, :, :]
-        C_t = initial_c[1, :, :]  
-
-        X = X[::-1, :, :]
-        for t, x in enumerate(np.split(X, X.shape[0], axis=0)):
-            gates = np.dot(x, np.transpose(W2)) + np.dot(H_t, np.transpose(R2)) + np.add(
-                *np.split(B2, 2))
-            i, o, f, c = np.split(gates, 4, -1)
-            i = Sigmoid(i + 0 * C_t)
-            f = Sigmoid(f + 0 * C_t)
-            c = Tanh(c)
-            C = f * C_t + i * c
-            o = Sigmoid(o + 0 * C)
-            H = o * Tanh(C)
-            H_t = H
-            C_t = C
-            Y[L-1-t, 1, :, :] = H
-
-        Hb[1, :, :] = H
-        Cb[1, :, :] = C
-
-        return Y, H, C
 
 def Return(*x): return x
 

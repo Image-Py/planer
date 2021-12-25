@@ -40,7 +40,7 @@ def conv_for(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1,
     # ============================================
     col_core = core.reshape((group, core.shape[0]//group, -1))
     col_img = col_img.reshape(group, cimg_w//group, -1)
-    rst = [i.dot(j) for i, j in zip(col_core, col_img)]
+    rst = [i @ j for i, j in zip(col_core, col_img)]
     rst = rst[0] if group==1 else np.concatenate(rst)
     return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
 
@@ -100,6 +100,25 @@ def avgpool(i, c=(2, 2), mar=(0,0,0,0), s=(2, 2)):
     rst = pool(i, np.add, c, mar, s, 0)
     rst /= c[0] * c[1]
     return rst
+
+def lstm(X, Y, w, r, b, ht, ct, dir=1):
+    def tanh(x): return np.tanh(x, out=x)
+
+    def sigmoid(x): 
+        x *= -1; np.exp(x, out=x); x += 1
+        return np.divide(1, x, out=x)
+
+    for t in list(range(X.shape[0]))[::dir]:
+        gates = np.dot(X[t:t+1], w.T)
+        gates += np.dot(ht, r.T)
+        gates += b[:b.shape[0]//2]
+        gates += b[b.shape[0]//2:]
+        i, o, f, c = np.split(gates, 4, -1)
+        sigmoid(i), sigmoid(f), tanh(c)
+        f *= ct; i *= c; f += i; C = f
+        o = sigmoid(o); o *= np.tanh(C)
+        Y[t], ht, ct = o, o, C
+    return Y, ht, ct
 
 def make_upmat(k):
     ys = np.linspace(0.5/k[0], 1-0.5/k[0], k[0]*1, dtype=np.float32)
