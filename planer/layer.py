@@ -52,7 +52,7 @@ def LeakyReLU(x, alpha=0.2):
 
 def Identity(x): return x
 
-def Tile(x, repeat): return np.tile(x, repeat)
+def Tile(x, repeat): return np.tile(x, repeat.tolist())
 
 def Flatten(x): return x.reshape((x.shape[0], -1))
 
@@ -119,7 +119,7 @@ def BatchNorm(x, K, B):
 
 def Unsqueeze(x, axes=None): 
     axis = np.array(axes).tolist()
-    return np.expand_dims(x, tuple(axes))
+    return np.expand_dims(x, tuple(axis))
 
 def Squeeze(x, axes=[0]):
     return np.squeeze(x, axis=axes[0])
@@ -143,9 +143,10 @@ def Shape(x): return np.array(x.shape)
 def Gather(x, idx, axis=0): return np.take(x, idx, axis=axis)
 
 def Reshape(x, shp): 
+    shp = shp.tolist()
     for i in range(len(shp)): 
         shp[i] = shp[i] or x.shape[i]
-    return x.reshape(shp.tolist())
+    return x.reshape(shp)
 
 def Transpose(x, axis): return x.transpose(axis)
 

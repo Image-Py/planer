@@ -1,5 +1,5 @@
 from .layer import wrap, layer_map as key
-from time import time
+import numpy, time
 from .util import np, clear_buf
 
 class Net:
@@ -33,7 +33,6 @@ class Net:
         dic = dict(self.body)
         rst = {'None': None}
         for k, v in zip(self.inits, self.weights): rst[k] = v
-        if type(x[0]) is dict: x = [x[0][i] for i in self.input]
 
         for k, v in zip(self.input, x): rst[k] = v
         for i in range(len(self.flow)):
@@ -48,7 +47,7 @@ class Net:
                 for k in set(xs): # release wasted obj
                     if k in rst and self.life[k]<=i: del rst[k]
                 obj = dic[l]
-                start = time()
+                start = time.time()
                 if debug:
                     print(l, obj.name, ':', obj.para())
                     outp = out #[(i, 'Weights')[i in self.inits] for i in out]
@@ -60,12 +59,12 @@ class Net:
                     for k in (y, [y])[isinstance(y, str)]:
                         print('\t<-- ',  k, ':', self.info(rst[k]))
                 # np.cuda.runtime.deviceSynchronize()
-                cost = time()-start
+                cost = time.time()-start
                 if not obj.name in self.timer:
                     self.timer[obj.name] = 0
                 self.timer[obj.name] += cost
         clear_buf()
-        return rst[y][0] if len(rst[y])==1 else rst[y]
+        return rst[y]
 
     def timeit(self, status='start'):
         if status == 'start': self.timer = {}
@@ -73,7 +72,7 @@ class Net:
             for i in self.timer: print(i, self.timer[i])
 
     def run(self, output=None, input={}):
-        rst = self.forward(input) # compatible with onnxruntime
+        rst = self(input) # compatible with onnxruntime
         return rst if isinstance(rst, tuple) else (rst,)
 
     def load_weights(self, data):
@@ -88,7 +87,13 @@ class Net:
         plot_net(self.input, self.inits, self.layer, self.flow)
 
     def __call__(self, *x, **key):
-        return self.forward(*x, **key)
+        if type(x[0]) is dict: x = [x[0][i] for i in self.input]
+        tp = [isinstance(i, numpy.ndarray) for i in x]
+        need = sum(tp)>0 and not numpy is np
+        if need: x = [np.asarray(i) if b else i for i,b in zip(x, tp)]
+        rst = self.forward(*x, **key)
+        if need: rst = tuple([i.get() for i in rst])
+        return rst[0] if len(rst)==1 else rst
 
 
 if __name__ == '__main__':

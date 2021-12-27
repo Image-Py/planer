@@ -117,7 +117,7 @@ def lstm(X, Y, w, r, b, ht, ct, dir=1):
         sigmoid(i), sigmoid(f), tanh(c)
         f *= ct; i *= c; f += i; C = f
         o = sigmoid(o); o *= np.tanh(C)
-        Y[t], ht, ct = o, o, C
+        Y[t], ht, ct = o[0], o[0], C
     return Y, ht, ct
 
 def make_upmat(k):
@@ -230,7 +230,7 @@ def grid_slice(H, W, h, w, mar):
     return list(itertools.product(a, b))
 
 def resize(img, size, backend=None):
-    nn = backend or np
+    nn = np if isinstance(img, np.ndarray) else numpy
     d, (h, w) = img.ndim, img.shape[:2]
     kh, kw = size[0]/h, size[1]/w
     slicer = -0.5+0.5/kh, h-0.5-0.5/kh, size[0]
@@ -248,7 +248,7 @@ def resize(img, size, backend=None):
     return buf[ra,:]*(1-rs) + buf[rb,:]*rs
 
 def mapcoord(img, rs, cs, keeptp=True, backend=None):
-    nn = backend or np
+    nn = np if isinstance(img, np.ndarray) else numpy
     d, (h, w) = img.ndim, img.shape[:2]
     nn.clip(rs, 0, h-1, out=rs)
     nn.clip(cs, 0, w-1, out=cs)
@@ -272,7 +272,8 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=p
         def wrap(*p, **key):
             (h, w), ori_img = p[0].shape[:2], p[0]
             samecore = isinstance(ori_img, np.ndarray)
-            img = np.asarray(ori_img, dtype=astype)
+            # img = np.asarray(ori_img, dtype=astype)
+            img = ori_img.astype('float32')
             tps = {'sample', 'window', 'glob', 'margin', 'progress'}
             ftp = fp, tp = {}, {}
             for i in key: ftp[i in tps][i] = key[i]
@@ -295,7 +296,7 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=p
             k = rst.shape[0]/(rcs[0][0].stop - rcs[0][0].start)
             if len(rcs)==1 and ssz!=[h, w]:
                 rst = resize(rst, (int(h*k), int(w*k)))
-            if len(rcs)==1: return rst if samecore else rst.get()
+            if len(rcs)==1: return rst
             def sk(ss, k):
                 sr = slice(int(ss[0].start*k), int(ss[0].stop*k))
                 sc = slice(int(ss[1].start*k), int(ss[1].stop*k))
@@ -321,8 +322,7 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=p
             np.divide(buf, count, out=buf, casting='unsafe')
             if ssz!=[h, w]: 
                 buf = resize(buf, (int(h*k), int(w*k)))
-            rst = buf.astype(rst.dtype)
-            return rst if samecore else rst.get()
+            return buf.astype(rst.dtype)
         return wrap
     return wrapf
 
