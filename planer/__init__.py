@@ -63,15 +63,22 @@ def download(url, path, info=print, progress=progress):
     f, rst = urllib.request.urlretrieve(url, path,
         lambda a,b,c: progress(int(100.0 * a * b/c), 100))
 
-def source(root, lst):
+def source(mroot, lst):
     for i in lst:
         if len(i)==3: i.insert(2, False)
-        i[2] = os.path.exists(root + '/' + i[0])
+        i[2] = os.path.exists(mroot + '/' + i[0])
     return lst
 
 def list_source(root, lst):
     print('%-20s%-10s%-10s\n'%('file name','required', 'installed')+'-'*40)
     for i in source(root, lst):print('%-20s%-10s%-10s'%(tuple(i[:3])))
+
+def planer_catlog():
+    req = urllib.request.Request('http://planer.imagepy.org/catlog.txt', 
+        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)\
+         AppleWebKit/537.36 (KHTML, like Gecko)\
+          Chrome/96.0.4664.110 Safari/537.36 Edg/96.0.1054.62'})
+    return json.loads(urllib.request.urlopen(req).read())
 
 def downloads(root, lst, names='required', force=False, info=print, progress=progress):
     source(root, lst)
@@ -83,7 +90,10 @@ def downloads(root, lst, names='required', force=False, info=print, progress=pro
     if not force: lst = [i for i in lst if not i[2]]
     # name = model.__name__.replace('planer_zoo.', '')
     if not os.path.exists(root): os.makedirs(root)
+    if len(lst)==0: return
+    catlog = planer_catlog()
     for name, a, b, url in lst:
+        if url[:4] != 'http': url = catlog[url]
         download(url, root+'/'+name, info, progress)
 
 # parse source from a markdown file
@@ -105,18 +115,21 @@ def get_source(path):
 
 def Model(model, auto=True):
     if hasattr(model, 'list_source'): return model
-    name = model.__name__.replace('planer_zoo.', '')
+    name = model.__package__.replace('planer_zoo.', '')
     md = model.__file__.replace('__init__.py', 'readme.py')[:-2]+'md'
     mroot = root +'/' +  '/'.join(name.split('.'))
     if hasattr(model, 'source'): 
         lst = [list(i) for i in model.source]
-        model.source = lambda m=mroot: source(m, lst)
-    else: model.source = lambda m=mroot: source(m, get_source(md))
+    else: lst = get_source(md)
+    for i in lst: 
+        i[-1] = model.__package__.replace('.', '/')+'/'+i[0] if i[-1]=='' else i[-1]
+    model.source = lambda m=mroot: source(m, lst)
     model.root, oroot = mroot, model.root
     ms = [getattr(model, i) for i in dir(model)]
     for m in set([inspect.getmodule(i) for i in ms]):
         if hasattr(m, 'root') and m.root == oroot: m.root = mroot
     model.list_source = lambda root=mroot, lst=model.source(): list_source(root, lst)
+
     model.download = lambda name='required', force=False, info=print, \
     	progress=progress, m=mroot: downloads(
     		m, model.source(), name, force, info, progress)

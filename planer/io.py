@@ -264,8 +264,8 @@ def onnx2pla(path, zip=True):
         json.dump(graph, f)
     if zip:
         with zipfile.ZipFile(path.replace('onnx', 'pla'), 'w') as f:
-            f.write(path.replace('onnx','json'))
-            f.write(path.replace('onnx','npy'))
+            f.write(path[:-4]+'json', os.path.split(path)[1][:-4]+'json')
+            f.write(path[:-4]+'npy', os.path.split(path)[1][:-4]+'npy')
         os.remove(path.replace('onnx','json'))
         os.remove(path.replace('onnx','npy'))
 

@@ -303,14 +303,14 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=p
                 return sr, sc
             outshp = int(img.shape[0]*k), int(img.shape[1]*k)
             outshp = outshp + rst.shape[2:]
-            weights = np.zeros(rst.shape[:2], dtype='uint16')
+            weights = numpy.zeros(rst.shape[:2], dtype='uint16')
             if rst.ndim==3: weights = weights[:,:,None]
             weights += int(mar * k) + 1
             for i in range(int(mar*k), 0, -1):
                 weights[i-1,:] = weights[-i,:] = i
                 weights[:,i-1] = weights[:,-i] = i
-            buf = np.zeros(outshp, dtype=np.float32)
-            count = np.zeros(outshp[:2], dtype='uint16')
+            buf = numpy.zeros(outshp, dtype=np.float32)
+            count = numpy.zeros(outshp[:2], dtype='uint16')
             if rst.ndim==3: count = count[:,:,None]
             buf[sk(rcs[0], k)] = rst * weights
             count[sk(rcs[0], k)] += weights
@@ -319,7 +319,7 @@ def tile(sample=1, glob=1, window=1024, margin=0.1, astype='float32', progress=p
                 rst = f(img[rcs[i]], *p[1:], **fp)
                 buf[sk(rcs[i], k)] += rst * weights
                 count[sk(rcs[i], k)] += weights
-            np.divide(buf, count, out=buf, casting='unsafe')
+            numpy.divide(buf, count, out=buf, casting='unsafe')
             if ssz!=[h, w]: 
                 buf = resize(buf, (int(h*k), int(w*k)))
             return buf.astype(rst.dtype)
