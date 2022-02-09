@@ -177,7 +177,7 @@ def pix_offset(img, dr, dc):
     if dr>=0: sr1s, sr1e, sr2s, sr2e, sr, rr = dr, h, 0, h-dr, (0, dr), 0
     else: sr1s, sr1e, sr2s, sr2e, sr, rr = 0, h+dr, -dr, h, (h+dr, h), h-1
     if dc>=0: sc1s, sc1e, sc2s, sc2e, sc, cc = dc, w, 0, w-dc, (0, dc), 0
-    else: sr1r, sr1e, sr2s, sr2e, sc, cc = 0, w+dc, -dc, w, (w+dc, w), w-1
+    else: sc1s, sc1e, sc2s, sc2e, sc, cc = 0, w+dc, -dc, w, (w+dc, w), w-1
     img[:, :, sr1s:sr1e, sc1s:sc1e] = img[:, :, sr2s:sr2e, sc2s:sc2e]
     img[:, :, slice(*sr), :] = img[:, :, rr:rr+1, :]
     img[:, :, :, slice(*sc)] = img[:, :, :, cc:cc+1]
@@ -193,9 +193,32 @@ def upsample_nearest(img, k, trans_mode='half-pixel', round_mode='round_prefer_c
     offr, offc = [offset(i, trans_mode, round_mode) for i in k]
     return pix_offset(rst, offr, offc)
 
+def upsample_size(img, size):
+    nc, (h, w) = img.shape[:-2], img.shape[-2:]
+    kh, kw = size[0]/h, size[1]/w
+    slicer = -0.5+0.5/kh, h-0.5-0.5/kh, size[0]
+    rs = np.linspace(*slicer, dtype=np.float32)
+    slicec = -0.5+0.5/kw, w-0.5-0.5/kw, size[1]
+    cs = np.linspace(*slicec, dtype=np.float32)
+    rs = np.clip(rs, 0, h-1, out=rs)
+    cs = np.clip(cs, 0, w-1, out=cs)
+    ra = np.floor(np.clip(rs, 0, h-1.001))
+    ca = np.floor(np.clip(cs, 0, w-1.001))
+    ra, ca = ra.astype(int), ca.astype(int)
+    rs -= ra; cs -= ca; rb = ra+1; cb = ca+1;
+    rs.shape, img.shape = (-1,1), (-1, h, w)
+    buf = img[:,:,ca]*(1-cs) + img[:,:,cb]*cs
+    result = buf[:,ra,:]*(1-rs) + buf[:,rb,:]*rs
+    return result.reshape(nc + size)
+
 def upsample(img, k, mode, trans_mode='half-pixcel', round_mode='round_prefer_ceil'):
-    if mode=='nearest': return upsample_nearest(img, k, trans_mode, round_mode)
-    if mode=='linear': return upsample_blinear(img, k)
+    kint = [int(k[0]), int(k[1])]
+    size = int(round(k[0]*img.shape[2])), int(round(k[1]*img.shape[3]))
+
+    if mode=='nearest': return upsample_nearest(img, kint, trans_mode, round_mode)
+    if mode=='linear': 
+        if k[0]==int(k[0]) and k[1]==int(k[1]): return upsample_blinear(img, kint)
+        else: return upsample_size(img, size)
     
 # ===== below is some image process function =====
 import math, itertools
@@ -237,10 +260,10 @@ def resize(img, size, backend=None):
     rs = nn.linspace(*slicer, dtype=nn.float32)
     slicec = -0.5+0.5/kw, w-0.5-0.5/kw, size[1]
     cs = nn.linspace(*slicec, dtype=nn.float32)
-    nn.clip(rs, 0, h-1, out=rs)
-    nn.clip(cs, 0, w-1, out=cs)
-    ra = nn.floor(nn.clip(rs, 0, h-1.5))
-    ca = nn.floor(nn.clip(cs, 0, w-1.5))
+    rs = nn.clip(rs, 0, h-1, out=rs)
+    cs = nn.clip(cs, 0, w-1, out=cs)
+    ra = nn.floor(nn.clip(rs, 0, h-1.001))
+    ca = nn.floor(nn.clip(cs, 0, w-1.001))
     ra, ca = ra.astype(int), ca.astype(int)
     rs -= ra; cs -= ca; rb = ra+1; cb = ca+1;
     rs.shape, cs.shape = (-1,1,1)[:d], (1,-1,1)[:d]

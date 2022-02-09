@@ -86,8 +86,8 @@ def UpSample(x, k, mode='nearest'):
 
 def Resize(x, roi, k, size=None, mode='nearest', 
     coordinate_transformation_mode='half_pixel', nearest_mode='round_prefer_floor'):
-    if k.size == 0: k = size[-2:] // np.array(x.shape[-2:])
-    return upsample(x, k[-2:].astype(int).tolist(), mode, 
+    if k.size == 0: k = size[-2:] / np.array(x.shape[-2:])
+    return upsample(x, k[-2:].tolist(), mode, 
         coordinate_transformation_mode, nearest_mode)
 
 def Concatenate(*xs, axis=0):
@@ -112,6 +112,12 @@ def ReduceSum(x, axis=-1, keepdims=False):
 
 def ReduceMean(x, axis=-1, keepdims=False):
     return x.mean(axis=tuple(axis), keepdims=keepdims)
+
+def ReduceMax(x, axis=-1, keepdims=False):
+    return x.max(axis=tuple(axis), keepdims=keepdims)
+
+def ReduceMin(x, axis=-1, keepdims=False):
+    return x.min(axis=tuple(axis), keepdims=keepdims)
 
 def BatchNorm(x, K, B):
     if ep: return ep.evaluate('x * K + B')
@@ -209,6 +215,19 @@ def InstanceNormalization(x, s, bias, epsilon=1e-5):
     x *= s/var; x += bias - s*mean/var
     return x
 
+def Greater(a, b): return np.greater(a, b)
+
+def NonZero(x): return np.array(np.nonzero(x))
+
+def GreaterOrEqual(a, b): return a >= b
+
+def TopK(x, k, axis=-1, largest=1, sorted=1):
+    idk = np.arange(k) * -largest - (largest>0)
+    idx = np.argsort(x, axis=axis)
+    idx = np.take(idx, idk, axis=axis)
+    vs = np.take_along_axis(x, idx, axis=axis)
+    return vs, idx
+
 def Pad(x, pads, constant_value=0, mode='constant'):
     pads = pads.reshape(2,-1).T.tolist()
     para = {'mode': mode}; 
@@ -231,12 +250,15 @@ layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU,
              'sub': Sub, 'reducemean': ReduceMean, 'exp': Exp, 'log': Log,
              'mul': Mul, 'gap': GlobalAveragePool, 'pow':Pow, 'matmul': MatMul,
              'identity' : Identity, 'tile': Tile, 'lstm':LSTM,
+             'reducemax':ReduceMax, 'reducemin': ReduceMin,
              'reducesum':ReduceSum, 'div':Div, 'unsqueeze':Unsqueeze, 
              'shape': Shape, 'gather':Gather, 'reshape':Reshape,
              'split':Split, 'tanh':Tanh, 'constantofshape':ConstantofShape,
              'slice':Slice, 'expand':Expand, 'cast':Cast, 'range':Range, 
              'equal':Equal, 'where':Where, 'scatternd':Scatternd,
              'instancenormalization':InstanceNormalization, 'clip':Clip,
+             'greater':Greater, 'nonzero':NonZero, 'greaterorequal':GreaterOrEqual,
+             'topk':TopK,
              'transpose':Transpose, 'logsoftmax':LogSoftmax, 'return':Return}
 
 if __name__ == "__main__": pass

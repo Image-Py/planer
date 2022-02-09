@@ -176,6 +176,14 @@ def read_onnx(path):
             axis = node(i.attribute, 'axes', 'ints')
             keep = node(i.attribute, 'keepdims', 'i')
             layers.append([i.name, 'reducemean', {'axis':axis, 'keepdims':keep}])
+        elif i.op_type == 'ReduceMax':
+            axis = node(i.attribute, 'axes', 'ints')
+            keep = node(i.attribute, 'keepdims', 'i')
+            layers.append([i.name, 'reducemax', {'axis':axis, 'keepdims':keep}])
+        elif i.op_type == 'ReduceMin':
+            axis = node(i.attribute, 'axes', 'ints')
+            keep = node(i.attribute, 'keepdims', 'i')
+            layers.append([i.name, 'reducemin', {'axis':axis, 'keepdims':keep}])
         elif i.op_type == 'Concat':
             layers.append([i.name, 'concat', {'axis':i.attribute[0].i}])
         elif i.op_type == 'Pad':
@@ -209,11 +217,22 @@ def read_onnx(path):
         elif i.op_type == 'Softmax':
             layers.append([i.name, 'softmax', {'axis':i.attribute[0].i}])
         elif i.op_type == 'ConstantOfShape': 
-            dim = i.attribute[0].t.dims
-            buf = i.attribute[0].t.raw_data
-            tp = types[i.attribute[0].t.data_type]
-            v = numpy.frombuffer(buf, tp).tolist()[0]
+            v = onnx.numpy_helper.to_array(i.attribute[0].t)
+            tp, v = str(v.dtype), v.tolist()
+            v = v[0] if len(v)==1 else 0
             layers.append([i.name, 'constantofshape', {'value':v, 'dtype':tp}])
+        elif i.op_type == 'Greater':
+            layers.append([i.name, 'greater', {}])
+        elif i.op_type == 'NonZero':
+            layers.append([i.name, 'nonzero', {}])
+        elif i.op_type == 'GreaterOrEqual':
+            layers.append([i.name, 'greaterorequal', {}])
+        elif i.op_type == 'TopK':
+            para = {}
+            node(i.attribute, 'axis', 'i', para)
+            node(i.attribute, 'largest', 'i', para)
+            node(i.attribute, 'sorted', 'i', para)
+            layers.append([i.name, 'topk', para])
         elif i.op_type == 'Split': 
             split = node(i.attribute, 'split', 'ints')
             para = {'axis': node(i.attribute, 'axis', 'i')}
