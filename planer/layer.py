@@ -36,7 +36,7 @@ def ConvTranspose2d(x, K, B=None, strides=[2,2], dilations=[1,1], pads=[0,0,0,0]
 def LSTM(X, W, R, B=0, sequence_lens=0, initial_h=0, initial_c=0, hidden_size=None, direction='forward'):
     dirs = {'forward':[1], 'reverse':[-1], 'bidirectional':[1,-1]}
     (L, N, input_dim), hidden_size = X.shape, R.shape[-1]
-    Y = np.zeros((L, len(dirs[direction]), N, hidden_size), dtype=np.float32)
+    Y = np.zeros((L, len(dirs[direction]), N, hidden_size), dtype=X.dtype)
     for i, d in enumerate(dirs[direction]):
         _, H, C = lstm(X, Y[:,i], W[i], R[i], B[i], initial_h[i], initial_c[i], d)
     return Y, H, C
@@ -46,7 +46,7 @@ def ReLU(x):
     return np.multiply(x, x>0, out=x)
 
 def LeakyReLU(x, alpha=0.2):
-    a, b = np.float32(alpha), np.float32(1-alpha)
+    a, b = np.array(alpha, x.dtype), np.array(1-alpha, x.dtype)
     if ep: return ep.evaluate('x*((x>0)*b+a)')
     y = (x>0) * b; y += a; y *= x; return y
 

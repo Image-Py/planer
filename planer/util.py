@@ -29,7 +29,7 @@ def conv_for(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1,
     global conv_buf
     img = img.transpose((1,0,2,3)) # nchw -> cnhw
     size = ci * w * h * ni * nh * nw
-    if len(conv_buf) < size: conv_buf = np.zeros(size, dtype=np.float32) 
+    if len(conv_buf) < size: conv_buf = np.zeros(size, dtype=img.dtype) 
     col_img = conv_buf[:size].reshape(ci, w*h,  ni, nh, nw) #(h*w, c, N, H, W)
     def set_value(img, i, v): img[:,i] = v
     for r in range(0, h*dh, dh):
@@ -73,7 +73,7 @@ def conv_dnn(img, core, bias=None, group=1, pads=(1, 1, 1, 1), strides=(1, 1), d
     else: img, pads = pad(img, shp, mode, constant_values=0), (0,0)
     nh = (hi + sum(shp[2]) - (h-1)*dh-1 + strh)//strh
     nw = (wi + sum(shp[3]) - (w-1)*dw-1 + strw)//strw    
-    y = np.zeros((ni, n, nh, nw), dtype='float32')
+    y = np.zeros((ni, n, nh, nw), dtype=img.dtype)
     dnn.convolution_forward(img, core, bias, y, pads, 
         (strides[0], strides[1]), (dilation[0], dilation[1]), 1, auto_tune=True, tensor_core='always')
     return y
@@ -86,7 +86,7 @@ def pool(img, f, core=(2, 2), pads=(0,0,0,0), stride=(2, 2),  const=0):
     dh = (h + sum(shp[2]) - core[0] + strh)//strh
     dw = (w + sum(shp[3]) - core[1] + strw)//strw
     nsh, nsw = dh * strh, dw * strw
-    buf = np.zeros(img.shape[:2]+(dh, dw), np.float32)
+    buf = np.zeros(img.shape[:2]+(dh, dw), img.dtype)
     if const != 0: buf[:] = const
     for r in range(0, ch, 1):
         for c in range(0, cw, 1):
@@ -121,8 +121,8 @@ def lstm(X, Y, w, r, b, ht, ct, dir=1):
     return Y, ht, ct
 
 def make_upmat(k):
-    ys = np.linspace(0.5/k[0], 1-0.5/k[0], k[0]*1, dtype=np.float32)
-    xs = np.linspace(0.5/k[1], 1-0.5/k[1], k[1]*1, dtype=np.float32)
+    ys = np.linspace(0.5/k[0], 1-0.5/k[0], k[0]*1, dtype=np.float16)
+    xs = np.linspace(0.5/k[1], 1-0.5/k[1], k[1]*1, dtype=np.float16)
     rs, cs = ys[:,None], xs[None,:]
     if k[0]==1: return np.vstack([1-xs, xs])
     if k[1]==1: return np.vstack([1-ys, ys])
@@ -197,9 +197,9 @@ def upsample_size(img, size):
     nc, (h, w) = img.shape[:-2], img.shape[-2:]
     kh, kw = size[0]/h, size[1]/w
     slicer = -0.5+0.5/kh, h-0.5-0.5/kh, size[0]
-    rs = np.linspace(*slicer, dtype=np.float32)
+    rs = np.linspace(*slicer, dtype=img.dtype)
     slicec = -0.5+0.5/kw, w-0.5-0.5/kw, size[1]
-    cs = np.linspace(*slicec, dtype=np.float32)
+    cs = np.linspace(*slicec, dtype=img.dtype)
     rs = np.clip(rs, 0, h-1, out=rs)
     cs = np.clip(cs, 0, w-1, out=cs)
     ra = np.floor(np.clip(rs, 0, h-1.001))

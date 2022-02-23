@@ -23,6 +23,11 @@ class Net:
         self.input, self.inits = inputs, [i[0] for i in inits]
         self.layer, self.flow = body, flow
 
+    def half(self):
+        for i in range(len(self.weights)):
+            if self.weights[i].dtype == np.float32:
+                self.weights[i] = self.weights[i].astype('float16')
+
     def info(self, obj):
         if isinstance(obj, list):
             return [self.info(i) for i in obj]
