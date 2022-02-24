@@ -169,21 +169,25 @@ def read_onnx(path):
         elif i.op_type == 'Pow':
             layers.append([i.name, 'pow', {}])
         elif i.op_type == 'ReduceSum':
-            axis = node(i.attribute, 'axes', 'ints')
-            keep = node(i.attribute, 'keepdims', 'i')
-            layers.append([i.name, 'reducesum', {'axis':axis, 'keepdims':keep}])
+            para = {}
+            node(i.attribute, 'axes', 'ints', para)
+            node(i.attribute, 'keepdims', 'i', para)
+            layers.append([i.name, 'reducesum', para])
         elif i.op_type == 'ReduceMean':
-            axis = node(i.attribute, 'axes', 'ints')
-            keep = node(i.attribute, 'keepdims', 'i')
-            layers.append([i.name, 'reducemean', {'axis':axis, 'keepdims':keep}])
+            para = {}
+            node(i.attribute, 'axes', 'ints', para)
+            node(i.attribute, 'keepdims', 'i', para)
+            layers.append([i.name, 'reducemean', para])
         elif i.op_type == 'ReduceMax':
-            axis = node(i.attribute, 'axes', 'ints')
-            keep = node(i.attribute, 'keepdims', 'i')
-            layers.append([i.name, 'reducemax', {'axis':axis, 'keepdims':keep}])
+            para = {}
+            node(i.attribute, 'axes', 'ints', para)
+            node(i.attribute, 'keepdims', 'i', para)
+            layers.append([i.name, 'reducemax', para])
         elif i.op_type == 'ReduceMin':
-            axis = node(i.attribute, 'axes', 'ints')
-            keep = node(i.attribute, 'keepdims', 'i')
-            layers.append([i.name, 'reducemin', {'axis':axis, 'keepdims':keep}])
+            para = {}
+            node(i.attribute, 'axes', 'ints', para)
+            node(i.attribute, 'keepdims', 'i', para)
+            layers.append([i.name, 'reducemin', para])
         elif i.op_type == 'Concat':
             layers.append([i.name, 'concat', {'axis':i.attribute[0].i}])
         elif i.op_type == 'Pad':
@@ -260,6 +264,10 @@ def read_onnx(path):
             layers.append([i.name, 'scatternd', {}])
         elif i.op_type == 'InstanceNormalization':
             layers.append([i.name, 'instancenormalization', {'epsilon':i.attribute[0].f}])
+        elif i.op_type == 'Sqrt':
+            layers.append([i.name, 'sqrt', {}])
+        elif i.op_type == 'Erf':
+            layers.append([i.name, 'erf', {}])
         elif i.op_type == 'Clip':
             minv = node(i.attribute, 'min', 'f')
             maxv = node(i.attribute, 'max', 'f')

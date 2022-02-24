@@ -50,6 +50,8 @@ def LeakyReLU(x, alpha=0.2):
     if ep: return ep.evaluate('x*((x>0)*b+a)')
     y = (x>0) * b; y += a; y *= x; return y
 
+def Sqrt(x): return np.sqrt(x)
+
 def Identity(x): return x
 
 def Tile(x, repeat): return np.tile(x, repeat.tolist())
@@ -65,11 +67,6 @@ def HardSigmoid(x, alpha=0.2, beta=0.5):
     x = x * alpha; x += beta
     x = np.minimum(x, 1, out=x)
     return np.maximum(x, 0, out=x)
-
-def Softmax(x, axis=-1):
-    x = np.exp(x)
-    x /= x.sum(axis=axis, keepdims=1)
-    return x
 
 def Maxpool(x, w=(2,2), pads=(0,0,0,0), strides=(2,2)):
     return maxpool(x, w, pads, strides)
@@ -101,23 +98,29 @@ def Sub(x1, x2):
     if ep: return ep.evaluate('x1 - x2')
     return x1 - x2
 
-def Pow(x, p): return np.power(x, p)
+def Mul(x1, x2): 
+    if ep: return ep.evaluate('x1 * x2')
+    return x1 * x2
     
 def Div(x1, x2): 
     if ep: return ep.evaluate('x1 / x2')
     return x1 / x2
 
-def ReduceSum(x, axis=-1, keepdims=False):
-    return x.sum(axis=tuple(axis), keepdims=keepdims)
+def Pow(x, p): 
+    if ep: return ep.evaluate('x ** p')
+    return np.power(x, p)
 
-def ReduceMean(x, axis=-1, keepdims=False):
-    return x.mean(axis=tuple(axis), keepdims=keepdims)
+def ReduceSum(x, axes=-1, keepdims=True):
+    return x.sum(axis=tuple(axes), keepdims=keepdims)
 
-def ReduceMax(x, axis=-1, keepdims=False):
-    return x.max(axis=tuple(axis), keepdims=keepdims)
+def ReduceMean(x, axes=-1, keepdims=True):
+    return x.mean(axis=tuple(axes), keepdims=keepdims)
 
-def ReduceMin(x, axis=-1, keepdims=False):
-    return x.min(axis=tuple(axis), keepdims=keepdims)
+def ReduceMax(x, axes=-1, keepdims=True):
+    return x.max(axis=tuple(axes), keepdims=keepdims)
+
+def ReduceMin(x, axes=-1, keepdims=True):
+    return x.min(axis=tuple(axes), keepdims=keepdims)
 
 def BatchNorm(x, K, B):
     if ep: return ep.evaluate('x * K + B')
@@ -130,19 +133,24 @@ def Unsqueeze(x, axes=None):
 def Squeeze(x, axes=[0]):
     return np.squeeze(x, axis=axes[0])
 
-def Mul(x1, x2): 
-    if ep: return ep.evaluate('x1 * x2')
-    return x1 * x2
-
 def Const(value=0, dtype='float32'): 
     if isinstance(value, list):
         return np.array(value, dtype=dtype)
     return value
 
+def Softmax(x, axis=-1):
+    y = x - np.max(x, axis=axis, keepdims=True)
+    ey = ep.evaluate('exp(y)') if ep else np.exp(y)
+    eX = np.sum(ey, axis=axis, keepdims=True)
+    if ep: return ep.evaluate('exp(y-log(eX))')
+    y -= np.log(eX, out=eX); return np.exp(y, out=y)
+
 def LogSoftmax(x, axis=-1):
     y = x - np.max(x, axis=axis, keepdims=True)
-    eX = np.sum(np.exp(y), axis=axis, keepdims=True)
-    y -= np.log(eX); return y
+    ey = ep.evaluate('exp(y)') if ep else np.exp(y)
+    eX = np.sum(ey, axis=axis, keepdims=True)
+    if ep: return ep.evaluate('y-log(eX)')
+    y -= np.log(eX, out=eX); return y
 
 def Shape(x): return np.array(x.shape)
 
@@ -238,6 +246,13 @@ def Clip(x, min=0, max=1):
     x = np.minimum(x, max, out=x)
     return np.maximum(x, min, out=x)
 
+from math import erf
+erflut = [erf(i/256-2) for i in range(1025)]
+def Erf(x):
+    if ep: x = ep.evaluate('((x-2)*(x<2)+4)*(x>-2)*256')
+    else: x -= 2; x *= x<0; x += 4; x *= x>0; x *= 256;
+    return np.array(erflut, x.dtype)[x.astype('int16')]
+
 def Return(*x): return x
 
 layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU, 
@@ -258,7 +273,7 @@ layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU,
              'equal':Equal, 'where':Where, 'scatternd':Scatternd,
              'instancenormalization':InstanceNormalization, 'clip':Clip,
              'greater':Greater, 'nonzero':NonZero, 'greaterorequal':GreaterOrEqual,
-             'topk':TopK,
+             'topk':TopK, 'sqrt': Sqrt, 'erf': Erf,
              'transpose':Transpose, 'logsoftmax':LogSoftmax, 'return':Return}
 
 if __name__ == "__main__": pass
