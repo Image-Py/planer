@@ -8,7 +8,7 @@ we support ONNX format, which enables the converting of trained model within var
 
 if __name__ == '__main__':
     setup(name='planer',
-        version='0.29',
+        version='0.30',
         url='https://github.com/Image-Py/planer',
         description='Powerful Light Artificial NEuRon',
         long_description=descr,

@@ -13,11 +13,11 @@ def wrap(f, layername='layer'):
     return Layer
 
 def Dense(x, K, B, shp=None):
-    y = x.dot(K.T)
+    y = np.matmul(x, K.T)
     y += B.reshape((1, -1))
     return y
 
-def MatMul(x, y): return x @ y
+def MatMul(x, y): return np.matmul(x, y)
 
 def Conv2d(x, K, B=None, group=1, strides=(1,1), dilations=(1,1), pads=(0,0,0,0)):
     if np is numpy: out = conv_for(x, K, group, pads, strides, dilations)

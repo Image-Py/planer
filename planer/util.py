@@ -40,7 +40,7 @@ def conv_for(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=(1,
     # ============================================
     col_core = core.reshape((group, core.shape[0]//group, -1))
     col_img = col_img.reshape(group, cimg_w//group, -1)
-    rst = [i @ j for i, j in zip(col_core, col_img)]
+    rst = [np.matmul(i, j) for i, j in zip(col_core, col_img)]
     rst = rst[0] if group==1 else np.concatenate(rst)
     return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
 
@@ -61,7 +61,7 @@ def conv_stride(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=
     # ============================================
     col_core = core.reshape(group, core.shape[0]//group, -1)
     col_img = col_img.reshape(group, cimg_w//group, -1)
-    rst = [i.dot(j) for i, j in zip(col_core, col_img)]
+    rst = [i.matmul(j) for i, j in zip(col_core, col_img)]
     rst = rst[0] if group==1 else np.concatenate(rst)
     return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
 
@@ -109,8 +109,8 @@ def lstm(X, Y, w, r, b, ht, ct, dir=1):
         return np.divide(1, x, out=x)
 
     for t in list(range(X.shape[0]))[::dir]:
-        gates = np.dot(X[t:t+1], w.T)
-        gates += np.dot(ht, r.T)
+        gates = np.matmul(X[t:t+1], w.T)
+        gates += np.matmul(ht, r.T)
         gates += b[:b.shape[0]//2]
         gates += b[b.shape[0]//2:]
         i, o, f, c = np.split(gates, 4, -1)
@@ -147,7 +147,7 @@ def upsample_blinear(img, k):
     if k[1]==1: imgs = [img[:,:,:-1,:], img[:,:,1:,:]]
     imgs = [i[:,:,:,:,None] for i in imgs]
     rst = np.concatenate(imgs, axis=-1)
-    rst = np.dot(rst.reshape((-1,len(imgs))), make_upmat(k))
+    rst = np.matmul(rst.reshape((-1,len(imgs))), make_upmat(k))
     hh, ww = h + (k[0]>1), w + (k[1]>1)
     rst = rst.reshape((-1, ww, k[0], k[1]))
     rst = rst.transpose((0,2,1,3))
