@@ -243,6 +243,8 @@ def Pad(x, pads, constant_value=0, mode='constant'):
     return np.pad(x, pads, **para)
 
 def Clip(x, min=0, max=1): 
+    minv, maxv = np.float16(min), np.float16(max)
+    if ep: return ep.evaluate('(((x-minv)*(x>minv))-(maxv-minv))*(x<maxv)+maxv')
     x = np.minimum(x, max, out=x)
     return np.maximum(x, min, out=x)
 

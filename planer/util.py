@@ -61,7 +61,7 @@ def conv_stride(img, core, group=1, pads=(1, 1, 1, 1), strides=(1, 1), dilation=
     # ============================================
     col_core = core.reshape(group, core.shape[0]//group, -1)
     col_img = col_img.reshape(group, cimg_w//group, -1)
-    rst = [i.matmul(j) for i, j in zip(col_core, col_img)]
+    rst = [np.matmul(i, j) for i, j in zip(col_core, col_img)]
     rst = rst[0] if group==1 else np.concatenate(rst)
     return rst.reshape((n, ni, nh, nw)).transpose(1, 0, 2, 3)
 
