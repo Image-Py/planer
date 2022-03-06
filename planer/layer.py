@@ -183,6 +183,8 @@ def Log(x):
     if ep: return ep.evaluate('log(x)')
     return np.log(x)
 
+def Reciprocal(x): return 1/x
+
 def Slice(x, start, end, axis=None, step=None):
     if step is None: step = np.ones(len(start), dtype=np.uint32)
     if axis is None: axis = np.arange(len(start))
@@ -275,7 +277,7 @@ layer_map = {'dense': Dense, 'conv': Conv2d, 'relu': ReLU,
              'equal':Equal, 'where':Where, 'scatternd':Scatternd,
              'instancenormalization':InstanceNormalization, 'clip':Clip,
              'greater':Greater, 'nonzero':NonZero, 'greaterorequal':GreaterOrEqual,
-             'topk':TopK, 'sqrt': Sqrt, 'erf': Erf,
+             'topk':TopK, 'sqrt': Sqrt, 'erf': Erf, 'reciprocal': Reciprocal,
              'transpose':Transpose, 'logsoftmax':LogSoftmax, 'return':Return}
 
 if __name__ == "__main__": pass

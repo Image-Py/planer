@@ -268,6 +268,8 @@ def read_onnx(path):
             layers.append([i.name, 'sqrt', {}])
         elif i.op_type == 'Erf':
             layers.append([i.name, 'erf', {}])
+        elif i.op_type=='Reciprocal':
+            layers.append([i.name, 'erf', {}])
         elif i.op_type == 'Clip':
             minv = node(i.attribute, 'min', 'f')
             maxv = node(i.attribute, 'max', 'f')
